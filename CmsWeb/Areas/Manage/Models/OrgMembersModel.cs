@@ -198,18 +198,21 @@ namespace CmsWeb.Models
                     if (SmallGroup.Contains(";"))
                     {
                         smallGroupList.AddRange(SmallGroup.Split(';').Select(x => x.Trim()));
-                    } else if (SmallGroup.Contains(","))
+                    }
+                    else if (SmallGroup.Contains(","))
                     {
                         smallGroupList.AddRange(SmallGroup.Split(';').Select(x => x.Trim()));
-                    } else
+                    }
+                    else
                     {
                         smallGroupList.Add(SmallGroup);
                     }
                 }
-				
+
                 if (Grades.HasValue())
-                    glist = (from g in (Grades ?? "").Split(new char[] { ',', ';' })
+                    glist = (from g in (Grades ?? "").Split(new char[] {',', ';'})
                              select g.ToInt()).ToArray();
+
                 var q = from om in DbUtil.Db.OrganizationMembers
                         where om.Organization.DivOrgs.Any(di => di.DivId == SourceDivId)
                         where SourceId == 0 || om.OrganizationId == SourceId
@@ -232,7 +235,6 @@ namespace CmsWeb.Models
                         q = from om in q
                             where om.OrgMemMemTags.Any(mm => smallGroupList.Contains(mm.MemberTag.Name))
                             select om;
-
                     }
                 }
                 if (null != Age && Age.Trim().Length > 0)

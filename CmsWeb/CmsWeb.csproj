@@ -402,6 +402,7 @@
     <Compile Include="Areas\Manage\Models\BatchModel\BatchRegSettings.cs" />
     <Compile Include="Areas\Manage\Models\BatchModel\FindTagPeople.cs" />
     <Compile Include="Areas\Manage\Models\BatchModel\UpdateOrgs.cs" />
+    <Compile Include="Areas\Manage\Models\OrgMembersModel2.cs" />
     <Compile Include="Areas\Manage\Models\UpdateFieldsLookups.cs" />
     <Compile Include="Areas\Manage\Models\UserValidationResult.cs" />
     <Compile Include="Areas\Manage\Models\UserValidationStatus.cs" />

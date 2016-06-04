@@ -11,13 +11,13 @@ namespace CmsWeb.Areas.Manage.Controllers
         [HttpGet]
         public ActionResult Index()
         {
-            var m = new OrgMembersModel();
+            var m = new OrgMembersModel2();
             m.FetchSavedIds();
             return View(m);
         }
 
         [HttpPost]
-        public ActionResult Move(OrgMembersModel m)
+        public ActionResult Move(OrgMembersModel2 m)
         {
             if (m.TargetId == 0)
                 return Content("!Target required");
@@ -25,20 +25,20 @@ namespace CmsWeb.Areas.Manage.Controllers
             return View("List", m);
         }
         [HttpPost]
-        public ActionResult EmailNotices(OrgMembersModel m)
+        public ActionResult EmailNotices(OrgMembersModel2 m)
         {
             m.SendMovedNotices();
             return View("List", m);
         }
         public ActionResult GradeList(int id)
         {
-            var m = new OrgMembersModel();
+            var m = new OrgMembersModel2();
             UpdateModel(m);
             return m.ToExcel(id);
         }
 
         [HttpPost]
-        public ActionResult List(OrgMembersModel m)
+        public ActionResult List(OrgMembersModel2 m)
         {
             m.ValidateIds();
             DbUtil.Db.SetUserPreference("OrgMembersModelIds", $"{m.ProgId}.{m.SourceDivId}.{m.SourceId}");
@@ -47,7 +47,7 @@ namespace CmsWeb.Areas.Manage.Controllers
             return View(m);
         }
         [HttpPost]
-        public ActionResult ResetMoved(OrgMembersModel m)
+        public ActionResult ResetMoved(OrgMembersModel2 m)
         {
             m.ResetMoved();
             return View("List", m);
