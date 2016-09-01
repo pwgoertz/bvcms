@@ -75,6 +75,7 @@ namespace CmsWeb.Areas.Public.Controllers
                           where p.Enabled == true
                           where s.Active == true
                           where p.Api <= dataIn.version
+                          where p.Rebranded == dataIn.rebranded
                           orderby p.Order
                           select new MobileHomeAction
                           {

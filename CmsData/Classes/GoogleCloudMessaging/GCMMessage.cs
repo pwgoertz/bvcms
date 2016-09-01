@@ -24,13 +24,14 @@ namespace CmsData.Classes.GoogleCloudMessaging
             this.data = data;
         }
 
-        public GCMMessage(List<int> peopleIDs, string exclude, GCMData data, GCMPayload notification)
+        public GCMMessage(List<int> peopleIDs, string exclude, GCMData data, GCMPayload notification, bool rebranded)
         {
             this.data = data;
             this.notification = notification;
 
             this.registration_ids = (from r in DbUtil.Db.MobileAppPushRegistrations
                                      where peopleIDs.Contains(r.PeopleId)
+                                     where r.Rebranded == rebranded
                                      select r.RegistrationId).ToList();
 
             if (exclude != null && exclude.Length > 0)
@@ -39,13 +40,14 @@ namespace CmsData.Classes.GoogleCloudMessaging
             }
         }
 
-        public GCMMessage(int peopleID, string exclude, GCMData data, GCMPayload notification)
+        public GCMMessage(int peopleID, string exclude, GCMData data, GCMPayload notification, bool rebranded)
         {
             this.data = data;
             this.notification = notification;
 
             this.registration_ids = (from r in DbUtil.Db.MobileAppPushRegistrations
                                      where r.PeopleId == peopleID
+                                     where r.Rebranded == rebranded
                                      select r.RegistrationId).ToList();
 
             if (exclude != null && exclude.Length > 0)

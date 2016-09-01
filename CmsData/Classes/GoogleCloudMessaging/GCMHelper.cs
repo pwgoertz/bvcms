@@ -18,9 +18,18 @@ namespace CmsData.Classes.GoogleCloudMessaging
 
         private const string GCM_URL = "https://gcm-http.googleapis.com/gcm/send";
 
-        private static void send(GCMMessage message)
+        private static void send(GCMMessage message, bool rebranded)
         {
-            string gcmkey = DbUtil.Db.Setting("GCMKey", ConfigurationManager.AppSettings["GCMKey"]);
+            string gcmkey;
+
+            if (rebranded)
+            {
+                gcmkey = DbUtil.Db.Setting("GCMKey", ConfigurationManager.AppSettings["GCMKey"]);
+            }
+            else
+            {
+                gcmkey = ConfigurationManager.AppSettings["GCMKey"];
+            }
 
             if (message.registration_ids.Count == 0 || gcmkey.Length == 0) return;
 
@@ -86,8 +95,14 @@ namespace CmsData.Classes.GoogleCloudMessaging
         public static void sendRefresh(int peopleID, int type)
         {
             GCMData data = new GCMData(type, ACTION_REFRESH, 0, "", "");
-            GCMMessage msg = new GCMMessage(peopleID, null, data, null);
-            send(msg);
+
+            // Send to rebranded
+            GCMMessage msgRebrand = new GCMMessage(peopleID, null, data, null, true);
+            send(msgRebrand, true);
+
+            // Send to TouchPoint
+            GCMMessage msg = new GCMMessage(peopleID, null, data, null, false);
+            send(msg, false);
         }
 
         public static void sendRefresh(List<int> peopleIDs, int type)
@@ -95,16 +110,28 @@ namespace CmsData.Classes.GoogleCloudMessaging
             if (peopleIDs.Count == 0) return;
 
             GCMData data = new GCMData(type, ACTION_REFRESH, 0, "", "");
-            GCMMessage msg = new GCMMessage(peopleIDs, null, data, null);
-            send(msg);
+
+            // Send to rebranded
+            GCMMessage msgRebrand = new GCMMessage(peopleIDs, null, data, null, true);
+            send(msgRebrand, true);
+
+            // Send to TouchPoint
+            GCMMessage msg = new GCMMessage(peopleIDs, null, data, null, false);
+            send(msg, false);
         }
 
         public static void sendNotification(int peopleID, int type, int id, string title, string message)
         {
             GCMPayload notification = new GCMPayload(title, message);
             GCMData data = new GCMData(type, ACTION_REFRESH_AND_NOTIFY, id, title, message);
-            GCMMessage msg = new GCMMessage(peopleID, null, data, notification);
-            send(msg);
+
+            // Send to rebranded
+            GCMMessage msgRebrand = new GCMMessage(peopleID, null, data, notification, true);
+            send(msgRebrand, true);
+
+            // Send to TouchPoint
+            GCMMessage msg = new GCMMessage(peopleID, null, data, notification, false);
+            send(msg, false);
         }
 
         public static void sendNotification(List<int> peopleIDs, int type, int id, string title, string message)
@@ -113,8 +140,14 @@ namespace CmsData.Classes.GoogleCloudMessaging
 
             GCMPayload notification = new GCMPayload(title, message);
             GCMData data = new GCMData(type, ACTION_REFRESH_AND_NOTIFY, id, title, message);
-            GCMMessage msg = new GCMMessage(peopleIDs, null, data, notification);
-            send(msg);
+
+            // Send to rebranded
+            GCMMessage msgRebrand = new GCMMessage(peopleIDs, null, data, notification, true);
+            send(msgRebrand, true);
+
+            // Send to TouchPoint
+            GCMMessage msg = new GCMMessage(peopleIDs, null, data, notification, false);
+            send(msg, false);
         }
     }
 }

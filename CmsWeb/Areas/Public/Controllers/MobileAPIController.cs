@@ -28,6 +28,29 @@ namespace CmsWeb.Areas.Public.Controllers
             return Content("1");
         }
 
+        [HttpPost]
+        public ActionResult CreateUser(string data)
+        {
+            BaseMessage dataIn = BaseMessage.createFromString(data);
+            MobilePostCreate mpc = JsonConvert.DeserializeObject<MobilePostCreate>(dataIn.data);
+
+            MobileAccount account = MobileAccount.Create(mpc.first, mpc.last, mpc.email, mpc.phone, mpc.dob);
+
+            var br = new BaseMessage();
+
+            if (account == null)
+            {
+                br.setError(BaseMessage.API_ERROR_CREATE_FAILED);
+            }
+            else
+            {
+                br.setNoError();
+                br.data = account.User.Username;
+            }
+
+            return br;
+        }
+
         private UserValidationResult AuthenticateUser(bool requirePin = false)
         {
             // Username and password checks are only necessary for the old iOS application
@@ -54,7 +77,7 @@ namespace CmsWeb.Areas.Public.Controllers
             if (!result.IsValid)
                 return AuthorizationError(result);
 
-            savePushID(Util.UserPeopleId ?? 0, dataIn.device, dataIn.key);
+            savePushID(Util.UserPeopleId ?? 0, dataIn.device, dataIn.key, dataIn.rebranded);
 
             MobileSettings ms = getUserInfo();
 
@@ -123,7 +146,7 @@ namespace CmsWeb.Areas.Public.Controllers
 
             AuthenticateUser(requirePin: true);
 
-            savePushID(Util.UserPeopleId ?? 0, dataIn.device, dataIn.key);
+            savePushID(Util.UserPeopleId ?? 0, dataIn.device, dataIn.key, dataIn.rebranded);
 
             MobileSettings ms = getUserInfo();
 
@@ -304,7 +327,7 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
             return ms;
         }
 
-        private void savePushID(int peopleID, int device, string pushID)
+        private void savePushID(int peopleID, int device, string pushID, bool rebranded)
         {
             if (pushID == null || pushID.Length == 0 || peopleID == 0) return;
 
@@ -319,12 +342,14 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
                 register.PeopleId = peopleID;
                 register.Type = device;
                 register.RegistrationId = pushID;
+                register.Rebranded = rebranded;
 
                 DbUtil.Db.MobileAppPushRegistrations.InsertOnSubmit(register);
             }
             else
             {
                 registration.PeopleId = peopleID;
+                registration.Rebranded = rebranded;
             }
 
             DbUtil.Db.SubmitChanges();
@@ -363,7 +388,7 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
             {
                 case 1: // Add
                 {
-                    savePushID(Util.UserPeopleId ?? 0, dataIn.device, dataIn.key);
+                    savePushID(Util.UserPeopleId ?? 0, dataIn.device, dataIn.key, dataIn.rebranded);
                     br.setNoError();
                     break;
                 }
@@ -414,7 +439,7 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
 
                     MobilePerson mp;
 
-                        foreach (var item in m.ApplySearch(mps.guest).OrderBy(p => p.Name2).Take(100))
+                    foreach (var item in m.ApplySearch(mps.guest).OrderBy(p => p.Name2).Take(100))
                     {
                         mp = new MobilePerson().populate(item);
                         mpl.Add(mp.id, mp);
@@ -428,7 +453,7 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
                 {
                     List<MobilePerson> mp = new List<MobilePerson>();
 
-                        foreach (var item in m.ApplySearch(mps.guest).OrderBy(p => p.Name2).Take(100))
+                    foreach (var item in m.ApplySearch(mps.guest).OrderBy(p => p.Name2).Take(100))
                     {
                         mp.Add(new MobilePerson().populate(item));
                     }
@@ -944,7 +969,6 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
             {
                 q = from o in DbUtil.Db.Organizations
                     where o.LimitToRole == null || roles.Contains(o.LimitToRole)
-                    //let sc = o.OrgSchedules.FirstOrDefault() // SCHED
                     where (o.OrganizationMembers.Any(om => om.PeopleId == pid // either a leader, who is not pending / inactive
                                        && (om.Pending ?? false) == false
                                        && (om.MemberTypeId != MemberTypeCode.InActive)
@@ -956,10 +980,8 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
             }
 
             var orgs = from o in q
-                           //let sc = o.OrgSchedules.FirstOrDefault() // SCHED
-                           //join sch in DbUtil.Db.OrgSchedules on o.OrganizationId equals sch.OrganizationId
                        from sch in DbUtil.Db.ViewOrgSchedules2s.Where(s => o.OrganizationId == s.OrganizationId).DefaultIfEmpty()
-                       from mtg in DbUtil.Db.Meetings.Where(m => o.OrganizationId == m.OrganizationId).OrderByDescending(m => m.MeetingDate).Take(1).DefaultIfEmpty()
+                       from mtg in DbUtil.Db.Meetings.Where(m => o.OrganizationId == m.OrganizationId && m.MeetingDate < DateTime.Today.AddDays(1)).OrderByDescending(m => m.MeetingDate).Take(1).DefaultIfEmpty()
                        orderby sch.SchedDay, sch.SchedTime
                        select new OrganizationInfo
                        {
@@ -1036,8 +1058,8 @@ AND RegSettingXml.value('(/Settings/Fees/DonationFundId)[1]', 'int') IS NULL";
 
             var meeting = DbUtil.Db.Meetings.SingleOrDefault(m => m.MeetingId == meetingId);
             var attendanceBySubGroup = meeting.Organization.AttendanceBySubGroups ?? false;
-            var people = attendanceBySubGroup 
-                ? RollsheetModel.RollListFilteredBySubgroup(meetingId, mprl.id, mprl.datetime, fromMobile: true) 
+            var people = attendanceBySubGroup
+                ? RollsheetModel.RollListFilteredBySubgroup(meetingId, mprl.id, mprl.datetime, fromMobile: true)
                 : RollsheetModel.RollList(meetingId, mprl.id, mprl.datetime, fromMobile: true);
 
             MobileRollList mrl = new MobileRollList();
