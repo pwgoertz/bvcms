@@ -64,8 +64,8 @@
             {
                 <li class="divider"></li>
                 <li class="dropdown-header">Org Members Reports</li>
-                <li><a href='/Reports/RollsheetForOrg' class="dialog-options qid" data-target="/Dialog/ForNewRollsheet/@oid">Rollsheet</a></li>
-                <li><a href='/Reports/RallyRollsheetForOrg' class="dialog-options" data-target="/Dialog/ForNewRallyRollsheet/@oid"><span class="org-context">Rally Rollsheet</span></a></li>
+                <li><a href='/Reports/RollsheetForOrg' class="dialog-options qid" data-target="/Dialog/ForNewRollsheet/@qid">Rollsheet</a></li>
+                <li><a href='/Reports/RallyRollsheetForOrg' class="dialog-options" data-target="/Dialog/ForNewRallyRollsheet/@qid"><span class="org-context">Rally Rollsheet</span></a></li>
                 <li><a href='/Reports/Roster1/@qid?oid=@oid' target="report"><span class="org-context">Roster Report</span></a></li>
                 <li><a href='/Reports/Roster/@qid?oid=@oid' target="report"><span class="org-context">Extended Roster</span></a></li>
                 <li><a href='/Reports/Registration/@qid?oid=@oid' target="_blank"><span class="org-context">Registration Report</span></a></li>
@@ -77,12 +77,10 @@
             }
             <li class="divider"></li>
             <li class="dropdown-header">Directories</li>
-            <li><a href="/Reports/FamilyDirectoryCompact/@qid" class="qid">Compact Directory</a></li>
-            <li><a href="/Reports/FamilyDirectory/@qid" class="qid">Family Directory</a></li>
-            <li><a href="/Reports/PictureDirectory/@qid" class="qid">Picture Directory</a></li>
-            <li><a href="/Reports/CompactPictureDirectory/@qid" class="qid">Compact Picture Directory</a></li>
-            <li class="hideAlt"><a href="/Reports/CompactPictureDirectory2/@qid" class="qid">Compact Picture Directory 2</a></li>
-            <li class="hideAlt2"><a href="/Reports/FamilyPictureDirectory/@qid" class="qid">Family Picture Directory</a></li>
+            <li><a href="/Reports/CompactDir/@qid" class="qid">Compact Directory</a></li>
+            <li><a href="/Reports/PictureDir/@qid" class="qid">Picture Directory</a></li>
+            <li><a href="/Reports/PictureDir4/@qid" class="qid">Picture Directory 4/page</a></li>
+            <li><a href="/Reports/FamilyPictureDir/@qid" class="qid">Family Picture Directory</a></li>
         </ul>
     </li>
     <li class="col-sm-4">
@@ -101,7 +99,7 @@
             {
                 <li class="divider"></li>
                 <li class="dropdown-header current-list pending-list orgcontext">Org Attendance</li>
-                <li><a id="RecentAbsents" href="/Reports/RecentAbsents1/@oid" target="_blank"><span class="org-context">Recent Absents Report</span></a></li>
+                <li><a id="RecentAbsents" href="/Reports/RecentAbsents1/@oid/@qid" target="_blank"><span class="qid">Recent Absents Report</span></a></li>
                 <li><a id="RecentAttendRpt" href="/Reports/PastAttendee/@oid" target="_blank"><span class="org-context">Recent Attendance Report</span></a></li>
                 <li><a id="AttendanceRpt" href="/Reports/Attendance/@oid"><span class="org-context">Attendance Percentages</span></a></li>
             }

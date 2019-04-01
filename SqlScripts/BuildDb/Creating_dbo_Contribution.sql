@@ -8,20 +8,22 @@ CREATE TABLE [dbo].[Contribution]
 [PeopleId] [int] NULL,
 [ContributionDate] [datetime] NULL,
 [ContributionAmount] [numeric] (11, 2) NULL,
-[ContributionDesc] [nvarchar] (256) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+[ContributionDesc] [nvarchar] (256) NULL,
 [ContributionStatusId] [int] NULL,
 [PledgeFlag] [bit] NULL,
 [ModifiedBy] [int] NULL,
 [ModifiedDate] [datetime] NULL,
 [PostingDate] [datetime] NULL,
-[BankAccount] [nvarchar] (250) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+[BankAccount] [nvarchar] (250) NULL,
 [ExtraDataId] [int] NULL,
-[CheckNo] [nvarchar] (20) COLLATE SQL_Latin1_General_CP1_CI_AS NULL,
+[CheckNo] [nvarchar] (20) NULL,
 [QBSyncID] [int] NULL,
 [TranId] [int] NULL,
 [Source] [int] NULL,
-[CampusId] [int] NULL
-)
+[CampusId] [int] NULL,
+[ImageID] [int] NOT NULL CONSTRAINT [DF_Contribution_ImageID] DEFAULT ((0)),
+[MetaInfo] [varchar] (100) NULL
+) ON [PRIMARY]
 GO
 IF @@ERROR <> 0 SET NOEXEC ON
 GO

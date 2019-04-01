@@ -654,6 +654,14 @@ namespace CmsData.API
             message = message.Replace("{orgbarcode}", $"{{orgbarcode:{orgId}}}");
             return message;
         }
+
+        public class Committment
+        {
+            public DateTime MeetingDate { get; set; }
+            public string Description { get; set; }
+            public string Date => MeetingDate.ToLongDateString();
+            public string Time => MeetingDate.ToLongTimeString();
+        }
         public void SendVolunteerReminders(int id, bool sendall)
         {
             var org = Db.LoadOrganizationById(id);
@@ -679,10 +687,10 @@ namespace CmsData.API
                          where AttendCommitmentCode.committed.Contains(a.Commitment ?? 0)
                          where a.MeetingDate >= DateTime.Today
                          orderby a.MeetingDate
-                         select new
+                         select new Committment()
                          {
-                             date = a.MeetingDate.ToLongDateString(),
-                             time = a.MeetingDate.ToLongTimeString()
+                             MeetingDate = a.MeetingDate,
+                             Description = setting.TimeSlots.FindDescription(a.MeetingDate)
                          }).ToList();
                 if (!q.Any())
                     continue;
@@ -692,11 +700,13 @@ namespace CmsData.API
         <tr>
             <td> Date </td>
             <td> Time </td>
+            <td> Description </td>
         </tr>
 {{#each this}}
             <tr>
-                <td>{{date}}</td>
-                <td>{{time}}</td>
+                <td>{{Date}}</td>
+                <td>{{Time}}</td>
+                <td>{{Description}}</td>
             </tr>
 {{/each}}
     </table>
@@ -759,7 +769,7 @@ namespace CmsData.API
 
         public void SendEventReminders(Guid id)
         {
-            var org = Db.LoadOrganizationById(Db.CurrentOrgId0);
+            var org = Db.LoadOrganizationById(Db.CurrentSessionOrgId);
             var setting = Db.CreateRegistrationSettings(org.OrganizationId);
 
             const string noSubject = "no subject";
@@ -781,9 +791,10 @@ namespace CmsData.API
             if (notify == null)
                 throw new Exception("no notify person");
 
+            var needdetails = message.Contains("{details}");
             foreach (var om in q)
             {
-                var details = SummaryInfo.GetResults(Db, om.PeopleId, om.OrganizationId);
+                var details = needdetails ? SummaryInfo.GetResults(Db, om.PeopleId, om.OrganizationId) : "";
                 var organizationName = org.OrganizationName;
 
                 subject = Util.PickFirst(setting.ReminderSubject, noSubject);
@@ -793,7 +804,8 @@ namespace CmsData.API
                 message = MessageReplacements(Db, om.Person, null, org.OrganizationId, organizationName, location, message);
 
                 message = message.Replace("{phone}", org.PhoneNumber.FmtFone7());
-                message = message.Replace("{details}", details);
+                if(details.HasValue())
+                    message = message.Replace("{details}", details);
 
                 Db.Email(notify.FromEmail, om.Person, subject, message);
             }

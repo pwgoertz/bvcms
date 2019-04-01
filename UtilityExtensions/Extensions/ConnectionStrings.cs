@@ -13,10 +13,15 @@ namespace UtilityExtensions
 {
     public static partial class Util
     {
+        private static string _host;
         public static string Host
         {
             get
             {
+                if (_host.HasValue())
+                {
+                    return _host;
+                }
 #if DEBUG
                 var testhost = HttpRuntime.Cache["testhost"] as string;
                 if (testhost.HasValue())
@@ -25,9 +30,14 @@ namespace UtilityExtensions
                 var h = ConfigurationManager.AppSettings["host"];
                 if (h.HasValue())
                     return h;
-                if (HttpContext.Current != null)
-                    return HttpContext.Current.Request.Url.Authority.SplitStr(".:")[0];
+                if (HttpContextFactory.Current != null)
+                    return HttpContextFactory.Current.Request.Url.Authority.SplitStr(".:")[0];
                 return null;
+            }
+
+            set
+            {
+                _host = value;
             }
         }
         public static string DbServer
@@ -58,14 +68,14 @@ namespace UtilityExtensions
             get
             {
                 if (IsDebug())
-                    return true;
+                    return false;
                 return ConfigurationManager.AppSettings["INSERT_X-FORWARDED-PROTO"] == "true";
             }
         }
         public static string GetConnectionString(string host)
         {
             var cs = ConnectionStringSettings(host) ?? ConfigurationManager.ConnectionStrings["CMS"];
-            var cb = new SqlConnectionStringBuilder(cs.ConnectionString);
+            var cb = new SqlConnectionStringBuilder(cs?.ConnectionString ?? "Data Source=(local);Integrated Security=True");
             if (string.IsNullOrEmpty(cb.DataSource))
                 cb.DataSource = DbServer;
             var a = host.SplitStr(".:");
@@ -101,10 +111,10 @@ namespace UtilityExtensions
         {
             get
             {
-                if (HttpContext.Current != null)
-                    if (HttpContext.Current.Session != null)
-                        if (HttpContext.Current.Session[STR_ConnectionString] != null)
-                            return HttpContext.Current.Session[STR_ConnectionString].ToString();
+                if (HttpContextFactory.Current != null)
+                    if (HttpContextFactory.Current.Session != null)
+                        if (HttpContextFactory.Current.Session[STR_ConnectionString] != null)
+                            return HttpContextFactory.Current.Session[STR_ConnectionString].ToString();
 
                 var cs = ConnectionStringSettings(Host);
                 var cb = new SqlConnectionStringBuilder(cs.ConnectionString);
@@ -115,8 +125,8 @@ namespace UtilityExtensions
             }
             set
             {
-                if (HttpContext.Current != null)
-                    HttpContext.Current.Session[STR_ConnectionString] = value;
+                if (HttpContextFactory.Current != null)
+                    HttpContextFactory.Current.Session[STR_ConnectionString] = value;
             }
         }
         private static string ReadOnlyConnectionString(bool finance = false)

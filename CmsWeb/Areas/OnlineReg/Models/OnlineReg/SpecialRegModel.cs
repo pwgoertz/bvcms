@@ -11,6 +11,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
 {
     public class SpecialRegModel
     {
+        public SpecialRegModel() { }
         public static Dictionary<string, string> ParseResults(NameValueCollection elements)
         {
             var q = (from e in elements.AllKeys
@@ -59,7 +60,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
 
             body = body.Replace("{church}", DbUtil.Db.Setting("NameOfChurch", "church"), true)
                 .Replace("{name}", person.Name, true)
-                .Replace("{date}", DateTime.Now.ToString("d"), true)
+                .Replace("{date}", Util.Now.ToString("d"), true)
                 .Replace("{email}", person.EmailAddress, true)
                 .Replace("{phone}", person.HomePhone.FmtFone(), true)
                 .Replace("{contact}", staff.Name, true)

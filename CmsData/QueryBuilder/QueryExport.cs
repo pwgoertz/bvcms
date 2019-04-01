@@ -40,6 +40,10 @@ namespace CmsData
                     andOrNot = $"\n{Level}AND NOT ";
                     not = "NOT ";
                     break;
+                case CompareType.AnyFalse:
+                    andOrNot = $"\n{Level}OR NOT ";
+                    not = "NOT ";
+                    break;
                 default:
                     throw new ArgumentException();
             }
@@ -70,6 +74,11 @@ namespace CmsData
         {
             var m = new ExportQueryModel();
             return m.ToString(c);
+        }
+        public static string ToSql(this Condition c, CMSDataContext db)
+        {
+            var qq = db.PeopleQueryCondition(c);
+            return db.GetWhereClause(qq);
         }
 
         public static bool HasCode(this string s)

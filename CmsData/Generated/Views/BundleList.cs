@@ -40,6 +40,8 @@ namespace CmsData.View
 		
 		private decimal? _TotalNonTaxDed;
 		
+		private int _BundleStatusId;
+		
 		
 		public BundleList()
 		{
@@ -246,6 +248,23 @@ namespace CmsData.View
 			{
 				if (this._TotalNonTaxDed != value)
 					this._TotalNonTaxDed = value;
+			}
+
+		}
+
+		
+		[Column(Name="BundleStatusId", Storage="_BundleStatusId", DbType="int NOT NULL")]
+		public int BundleStatusId
+		{
+			get
+			{
+				return this._BundleStatusId;
+			}
+
+			set
+			{
+				if (this._BundleStatusId != value)
+					this._BundleStatusId = value;
 			}
 
 		}

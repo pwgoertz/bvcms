@@ -1,8 +1,9 @@
+using CmsData;
+using CmsData.Classes.HealthChecker;
+using CmsData.Classes.RoleChecker;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
-using CmsData;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.People.Models
@@ -25,6 +26,8 @@ namespace CmsWeb.Areas.People.Models
         public string OrgType { get; set; }
         public bool HasDirectory { get; set; }
         public bool IsLeaderAttendanceType { get; set; }
+        public bool IsProspect { get; set; }
+        public bool IsMissionTripOrg { get; set; }
 
         public List<OrgMemberInfo> ChildOrgs { get; set; }
 
@@ -44,7 +47,7 @@ namespace CmsWeb.Areas.People.Models
                 case "name":
                 case "organization":
                     if (inAccessRole &&
-                        (IsLeaderAttendanceType || !inOrgLeadersOnlyRole || !DbUtil.Db.Setting("UX-OrgLeadersOtherGroupsContentOnly")))
+                        (IsLeaderAttendanceType || !inOrgLeadersOnlyRole || !RoleChecker.HasSetting(SettingName.OtherGroupsContentOnly, false)))
                     {
                         return $"<a href=\"/Org/{OrgId}\">{Name}</a>";
                     }
@@ -59,7 +62,9 @@ namespace CmsWeb.Areas.People.Models
                         return $"<a title=\"{DivisionName}\" href=\"/MemberDirectory/{OrgId}\">{Name}</a>";
                     }
 
-                    return $"<a title=\"{DivisionName}\" href=\"/OrgContent/{OrgId}\">{Name}</a>";
+                    return IsProspect
+                        ? Name
+                        : $"<a title=\"{DivisionName}\" href=\"/OrgContent/{OrgId}\">{Name}</a>";
                 case "enroll date":
                 case "enrolldate":
                     return EnrollDate.FormatDate();
@@ -71,7 +76,7 @@ namespace CmsWeb.Areas.People.Models
                 case "schedule":
                     return Schedule;
                 case "leader":
-                    if (inAccessRole && !(inOrgLeadersOnlyRole && DbUtil.Db.Setting("UX-OrgLeadersOtherGroupsContentOnly")))
+                    if (inAccessRole && !RoleChecker.HasSetting(SettingName.OtherGroupsContentOnly, false))
                     {
                         return $"<a href=\" /Person2/{LeaderId}\">{LeaderName}</a>";
                     }
@@ -85,21 +90,58 @@ namespace CmsWeb.Areas.People.Models
                 case "orgtype":
                     return OrgType;
                 case "membertype":
-                    if(column.Page == "Previous" && inAccessRole)
+                    if (MemberType.Equal("Inactive") && IsMissionTripOrg)
+                    {
+                        MemberType = "Sender";
+                    }
+
+                    if (column.Page == "Previous" && inAccessRole)
+                    {
                         return $"<a class=\"membertype\" href=\"/OrgPrevMemberDialog/{OrgId}/{PeopleId}\">{MemberType}</a>";
-                    if(inAccessRole)
+                    }
+
+                    if (inAccessRole)
+                    {
                         return $"<a class=\"membertype\" href=\"/OrgMemberDialog/Member/{OrgId}/{PeopleId}\">{MemberType}</a>";
+                    }
+
                     return MemberType;
                 case "viewcalendar":
                     return $"<a href=\"/OnlineReg/{OrgId}\">{column.Label}</a>";
                 case "leave":
-                    if(column.Page == "Current")
+                    if (column.Page == "Current")
+                    {
                         return $"<button class=\"leave-org\" data-personid=\"{PeopleId}\" data-orgid=\"{OrgId}\">{column.Label}</button>";
+                    }
                     else
+                    {
                         return "";
+                    }
+
+                case "lastvisit":
+                case "last visit":
+                    return HealthChecker.GetLastVisit(OrgId)?.ToShortDateString();
+                case "health":
+                    var healthLabel = HealthChecker.GetHealthLabel(OrgId);
+                    switch (healthLabel.ToUpper())
+                    {
+                        case "RED":
+                            return $"<span class=\"text-center btn-block alert-danger\">{healthLabel}</span>";
+                        case "YELLOW":
+                            return $"<span class=\"text-center btn-block alert-warning\">{healthLabel}</span>";
+                        case "GREEN":
+                            return $"<span class=\"text-center btn-block alert-success\">{healthLabel}</span>";
+                        case "BRIGHT":
+                            return $"<span class=\"text-center btn-block\" style=\"background-color:LawnGreen \">{healthLabel}</span>";
+                        default:
+                            return string.Empty;
+                    }
                 default:
-                    if(_extraFields == null)
+                    if (_extraFields == null)
+                    {
                         _extraFields = DbUtil.Db.LoadOrganizationById(OrgId)?.GetOrganizationExtras();
+                    }
+
                     return _extraFields?.SingleOrDefault(x => x.Field.ToLower() == field)?.Data;
             }
         }

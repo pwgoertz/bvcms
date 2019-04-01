@@ -1,7 +1,12 @@
 ﻿using CmsData;
+using ImageData;
 using System;
 using System.Linq;
 using UtilityExtensions;
+
+// ReSharper disable MemberInitializerValueIgnored
+// ReSharper disable RedundantDefaultMemberInitializer
+// ReSharper disable CheckNamespace
 
 namespace CmsWeb.CheckInAPI
 {
@@ -14,6 +19,10 @@ namespace CmsWeb.CheckInAPI
         public string last = "";
 
         public string goesby = "";
+        public string altName = "";
+
+        public string father = "";
+        public string mother = "";
 
         public int genderID = 0;
         public int maritalStatusID = 0;
@@ -46,7 +55,7 @@ namespace CmsWeb.CheckInAPI
         public int pictureX = 0;
         public int pictureY = 0;
 
-        public CheckInPerson populate(CmsData.Person p)
+        public CheckInPerson populate(Person p)
         {
             id = p.PeopleId;
             familyID = p.FamilyId;
@@ -55,6 +64,10 @@ namespace CmsWeb.CheckInAPI
             last = p.LastName ?? "";
 
             goesby = p.NickName;
+            altName = p.AltName;
+
+            father = p.GetRecReg().Fname;
+            mother = p.GetRecReg().Mname;
 
             genderID = p.GenderId;
             maritalStatusID = p.MaritalStatus.Id;
@@ -87,11 +100,11 @@ namespace CmsWeb.CheckInAPI
 
         public void loadImage()
         {
-            Person p = DbUtil.Db.LoadPersonById(id);
+            Person p = CmsData.DbUtil.Db.LoadPersonById(id);
 
             if (p.Picture != null)
             {
-                var image = ImageData.DbUtil.Db.Images.SingleOrDefault(i => i.Id == p.Picture.SmallId);
+                Image image = ImageData.DbUtil.Db.Images.SingleOrDefault(i => i.Id == p.Picture.SmallId);
 
                 if (image != null)
                 {
@@ -103,13 +116,3 @@ namespace CmsWeb.CheckInAPI
         }
     }
 }
-
-
-
-
-
-
-
-
-
-

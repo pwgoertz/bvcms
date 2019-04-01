@@ -1,13 +1,14 @@
 ﻿@model CmsWeb.Areas.Main.Models.MassEmailer
 @using System.Configuration
 @using CmsData
+@using CmsData.Classes.RoleChecker
 @using CmsWeb
 @{
   Layout = ViewExtensions2.TouchPointLayout();
   ViewBag.Title = "Email";
   ViewBag.PageHeader = "Email";
 
-  var showAdvanced = !(User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-LimitToolbarForOrgLeaders"));
+  var showAdvanced = !RoleChecker.HasSetting(SettingName.LimitToolbar, true);
 }
 @section head
 {
@@ -45,6 +46,7 @@
                     @Html.Hidden("wantParents", Model.wantParents)
                     @Html.Hidden("ccparents", Model.CcParents)
                     @Html.Hidden("noDuplicates", Model.noDuplicates)
+                    @Html.Hidden("OnlyProspects", Model.OnlyProspects)
                     <div class="form-group">
                         <label for="FromAddress" class="col-sm-2 control-label">From:</label>
                         <div class="col-sm-10">
@@ -77,6 +79,14 @@
                                         }
                                     }
                                 </select>
+
+                                if (Model.RecipientIds != null)
+                                {
+                                  foreach (var rId in Model.RecipientIds)
+                                  {
+                                    <input type="hidden" name="RecipientIds" value="@rId" />
+                                  }
+                                }
                                 if (Model.Recipients.Count() <= 500)
                                 {
                                     <p class="help-block">@Model.Count @( Model.Count != 1 ? "people" : "person")@(Model.wantParents ? " including parents." : ".")</p>
@@ -114,7 +124,7 @@
                         </div>
                     </div>
                     <div class="pull-right" style="margin-bottom: 5px;">
-                        <a href="http://docs.touchpointsoftware.com/EmailTexting/EmailReplacements.html" target="_blank" class="btn btn-default btn-sm"><i class="fa fa-question-circle"></i> Email Replacement Codes</a>
+                        <a href="https://docs.touchpointsoftware.com/EmailTexting/EmailReplacements.html" target="_blank" class="btn btn-default btn-sm"><i class="fa fa-question-circle"></i> Email Replacement Codes</a>
                     </div>
                     <div class="form-group">
                         <div class="col-sm-offset-2 col-sm-10">

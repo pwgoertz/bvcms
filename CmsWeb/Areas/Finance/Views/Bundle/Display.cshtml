@@ -1,8 +1,10 @@
-﻿@using CmsData.Codes
+﻿@using CmsData
+@using CmsData.Codes
 @using UtilityExtensions
 @model CmsWeb.Areas.Finance.Models.BundleModel
 @{
     var difference = Model.TotalHeader() - Model.TotalItems();
+  var customreport = DbUtil.Db.Setting("CustomBundleReport", "");
 }
 <div class="row">
     <div class="col-sm-12 col-md-12 col-lg-12">
@@ -15,22 +17,22 @@
                             Actions <span class="caret"></span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-right">
-                            @if (Model.IsAdmin || Model.IsOpen)
+                            @if (Model.IsAdmin || Model.BundleStatusId != BundleStatusCode.Closed)
                             {
+                                if (!User.IsInRole("FinanceDataEntry"))
+                                {
                                 <li><a id="delete" href="/Bundle/Delete/@Model.BundleId"><i class="fa fa-trash"></i>&nbsp;&nbsp;Delete</a></li>
+                                }
                             }
                             @if (Model.CanEdit)
                             {
                                 <li><a id="editbundle" href="/Bundle/Edit/@Model.BundleId"><i class="fa fa-pencil"></i>&nbsp;&nbsp;Edit Bundle Header</a></li>
                             }
-                            @if (Model.IsOpen)
+                            @if (Model.BundleStatusId != BundleStatusCode.Closed)
                             {
                                 <li><a href="/PostBundle/@Model.BundleId"><i class="fa fa-pencil-square-o"></i>&nbsp;&nbsp;Post Bundle / Edit</a></li>
                             }
-                            @if (Model.IsOpen || Model.IsAdmin || Model.CanEdit)
-                            {
-                                <li class="divider"></li>
-                            }
+                            <li class="divider"></li>
                             <li><a href="/Bundles/NewBundle/"><i class="fa fa-plus-circle"></i>&nbsp;&nbsp;Create New Bundle</a></li>
                         </ul>
                     </div>
@@ -79,6 +81,13 @@
                             <span class="stat-title">ITEM COUNT</span>
                             <span class="stat-figure">@Model.Count().ToString("N0")</span>
                         </div>
+			@if (customreport.HasValue())
+                  	{
+                  	<div class="stat-panel">
+                    	    <span class="stat-title">&nbsp;</span>
+                    	    <span class="stat-figure"><a href="@customreport.Replace("{bundleid}", Model.BundleId.ToString())" target="bundlerpt" style="color:white">Bundle Report</a></span>
+                  	</div>
+                  	}
                         <div style="clear: both;"></div>
                     </div>
                 </div>
@@ -91,7 +100,7 @@
                             Actions <span class="caret"></span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-right btn-block">
-                            @if (Model.IsAdmin || Model.IsOpen)
+                            @if (Model.IsAdmin || Model.BundleStatusId != BundleStatusCode.Closed)
                             {
                                 <li><a id="delete" href="/Bundle/Delete/@Model.BundleId"><i class="fa fa-trash"></i>&nbsp;&nbsp;Delete</a></li>
                             }
@@ -99,14 +108,11 @@
                             {
                                 <li><a id="editbundle" href="/Bundle/Edit/@Model.BundleId"><i class="fa fa-pencil"></i>&nbsp;&nbsp;Edit Bundle Header</a></li>
                             }
-                            @if (Model.IsOpen)
+                            @if (Model.BundleStatusId != BundleStatusCode.Closed)
                             {
                                 <li><a href="/PostBundle/@Model.BundleId"><i class="fa fa-pencil-square-o"></i>&nbsp;&nbsp;Post Bundle / Edit</a></li>
                             }
-                            @if (Model.IsOpen || Model.IsAdmin || Model.CanEdit)
-                            {
-                                <li class="divider"></li>
-                            }
+                            <li class="divider"></li>
                             <li><a href="/Bundles/NewBundle/"><i class="fa fa-plus-circle"></i>&nbsp;&nbsp;Create New Bundle</a></li>
                         </ul>
                     </div>

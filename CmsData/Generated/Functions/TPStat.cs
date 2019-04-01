@@ -46,11 +46,15 @@ namespace CmsData.View
 		
 		private int? _Nmydata;
 		
+		private int? _Nadmins;
+		
 		private int? _Reg;
 		
 		private DateTime? _Firstactive;
 		
 		private int? _Notam;
+		
+		private int? _Campuses;
 		
 		
 		public TPStat()
@@ -314,6 +318,23 @@ namespace CmsData.View
 		}
 
 		
+		[Column(Name="nadmins", Storage="_Nadmins", DbType="int")]
+		public int? Nadmins
+		{
+			get
+			{
+				return this._Nadmins;
+			}
+
+			set
+			{
+				if (this._Nadmins != value)
+					this._Nadmins = value;
+			}
+
+		}
+
+		
 		[Column(Name="reg", Storage="_Reg", DbType="int")]
 		public int? Reg
 		{
@@ -360,6 +381,23 @@ namespace CmsData.View
 			{
 				if (this._Notam != value)
 					this._Notam = value;
+			}
+
+		}
+
+		
+		[Column(Name="campuses", Storage="_Campuses", DbType="int")]
+		public int? Campuses
+		{
+			get
+			{
+				return this._Campuses;
+			}
+
+			set
+			{
+				if (this._Campuses != value)
+					this._Campuses = value;
 			}
 
 		}

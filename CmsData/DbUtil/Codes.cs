@@ -38,6 +38,7 @@ namespace CmsData.Codes
         public const int TypeSavedDraft = 3;
         public const int TypeSqlScript = 4;
         public const int TypePythonScript = 5;
+        public const int TypeUnlayerSavedDraft = 6;
     }
     public static class MemberStatusCode
     {
@@ -125,6 +126,7 @@ namespace CmsData.Codes
     {
         public const int Teacher = 160;
         public const int Member = 220;
+        public const int Leader = 140;
         public const int InActive = 230;
         public const int VisitingMember = 300;
         public const int Visitor = 310;
@@ -132,6 +134,12 @@ namespace CmsData.Codes
         public const int InServiceMember = 500;
         public const int VIP = 700;
         public const int Drop = -1;
+
+        public static int[] ProspectInactive =
+        {
+            Prospect,
+            InActive,
+        };
     }
     public static class ReturnFamilyMemberTypeCode
     {
@@ -236,6 +244,7 @@ namespace CmsData.Codes
     {
         public const int Closed = 0;
         public const int Open = 1;
+        public const int OpenForDataEntry = 2;
     }
     public class BundleTypeCode
     {
@@ -248,11 +257,22 @@ namespace CmsData.Codes
         public const int GiftsInKind = 30;
         public const int Stock = 32;
     }
+    public class BundleReferenceIdTypeCode
+    {
+        public const int PushPayBatch = 1;
+        public const int PushPaySettlement = 2;
+        public const int PushPayStandaloneTransaction = 3;
+    }
     public class ContributionStatusCode
     {
         public const int Recorded = 0;
         public const int Reversed = 1;
         public const int Returned = 2;
+    }
+    public class ContributionOriginCode
+    {
+        public const int Default = 0;
+        public const int PushPay = 1;
     }
     public class FundStatusCode 
     {

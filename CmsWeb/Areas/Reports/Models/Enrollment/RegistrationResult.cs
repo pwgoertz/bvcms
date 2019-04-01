@@ -5,15 +5,16 @@
  * You may obtain a copy of the License at http://bvcms.codeplex.com/license
  */
 
-using System;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Web.Mvc;
 using CmsData;
 using CmsData.Codes;
 using CmsData.Registration;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
+using System;
+using System.Data;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Web.Mvc;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.Reports.Models
@@ -22,16 +23,16 @@ namespace CmsWeb.Areas.Reports.Models
     {
         private const float FLOAT_t1SpacingAfter = 20f;
         private readonly PageEvent pageEvents = new PageEvent();
-        private Font boldfont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10);
+        private readonly Font boldfont = FontFactory.GetFont(FontFactory.HELVETICA_BOLD, 10);
         private PdfContentByte dc;
         private Document doc;
         private DateTime dt;
-        private Font font = FontFactory.GetFont(FontFactory.HELVETICA, 10);
-        private Font monofont = FontFactory.GetFont(FontFactory.COURIER, 8);
+        private readonly Font font = FontFactory.GetFont(FontFactory.HELVETICA, 10);
+        private readonly Font monofont = FontFactory.GetFont(FontFactory.COURIER, 8);
         private int? oid;
         private Guid? qid;
-        private Font smallfont = FontFactory.GetFont(FontFactory.HELVETICA, 8, new GrayColor(50));
-        private Font xsmallfont = FontFactory.GetFont(FontFactory.HELVETICA, 7, new GrayColor(50));
+        private readonly Font smallfont = FontFactory.GetFont(FontFactory.HELVETICA, 8, new GrayColor(50));
+        private readonly Font xsmallfont = FontFactory.GetFont(FontFactory.HELVETICA, 7, new GrayColor(50));
 
         public RegistrationResult(Guid? id, int? oid)
         {
@@ -65,7 +66,10 @@ namespace CmsWeb.Areas.Reports.Models
                 pageEvents.StartPageSet($"Registration Report: {dt:d}");
                 var q2 = DbUtil.Db.PeopleQuery(qid.Value);
                 if (!oid.HasValue)
-                    oid = DbUtil.Db.CurrentOrgId;
+                {
+                    oid = DbUtil.Db.CurrentSessionOrgId;
+                }
+
                 var q = from p in q2
                         orderby p.Name2
                         select new
@@ -77,29 +81,44 @@ namespace CmsWeb.Areas.Reports.Models
                             o = p.OrganizationMembers.SingleOrDefault(om => om.OrganizationId == oid).Organization
                         };
                 if (!q.Any())
+                {
                     doc.Add(new Phrase("no data"));
+                }
                 else
+                {
                     foreach (var i in q)
                     {
                         Settings setting = null;
                         if (i.o != null)
+                        {
                             setting = DbUtil.Db.CreateRegistrationSettings(i.o.OrganizationId);
+                        }
+
                         var t1 = new PdfPTable(1);
                         SetDefaults(t1);
                         t1.AddCell(i.p.Name);
                         t1.AddCell(i.p.PrimaryAddress);
                         if (i.p.PrimaryAddress2.HasValue())
+                        {
                             t1.AddCell(i.p.PrimaryAddress2);
+                        }
+
                         t1.AddCell(i.p.CityStateZip);
                         t1.AddCell(i.p.EmailAddress);
                         if (i.p.HomePhone.HasValue())
+                        {
                             t1.AddCell(i.p.HomePhone.FmtFone("H"));
+                        }
+
                         if (i.p.CellPhone.HasValue())
+                        {
                             t1.AddCell(i.p.CellPhone.FmtFone("C"));
+                        }
+
                         t1.SpacingAfter = FLOAT_t1SpacingAfter;
                         doc.Add(t1);
 
-                        var t2 = new PdfPTable(new float[] {35, 65});
+                        var t2 = new PdfPTable(new float[] { 35, 65 });
                         SetDefaults(t2);
                         if (i.h != null
                             && i.h.PeopleId != i.p.PeopleId
@@ -107,21 +126,33 @@ namespace CmsWeb.Areas.Reports.Models
                         {
                             t2.AddCell(i.h.Name);
                             if (i.h.CellPhone.HasValue())
+                            {
                                 t2.AddCell(i.h.CellPhone.FmtFone("C"));
+                            }
                             else if (i.h.HomePhone.HasValue())
+                            {
                                 t2.AddCell(i.h.HomePhone.FmtFone("H"));
+                            }
                             else
+                            {
                                 t2.AddCell(" ");
+                            }
                         }
                         if (i.s != null)
                         {
                             t2.AddCell(i.s.Name);
                             if (i.s.CellPhone.HasValue())
+                            {
                                 t2.AddCell(i.s.CellPhone.FmtFone("C"));
+                            }
                             else if (i.s.HomePhone.HasValue())
+                            {
                                 t2.AddCell(i.s.HomePhone.FmtFone("H"));
+                            }
                             else
+                            {
                                 t2.AddCell(" ");
+                            }
                         }
                         t2.AddCell(" ");
                         t2.AddCell(" ");
@@ -139,11 +170,13 @@ namespace CmsWeb.Areas.Reports.Models
                         doc.Add(t2);
 
                         if (rr.MedicalDescription.HasValue())
+                        {
                             doc.Add(new Phrase("Allergies: " + rr.MedicalDescription));
+                        }
 
                         if (i.o == null || SettingVisible(setting, "AskTylenolEtc"))
                         {
-                            var t4 = new PdfPTable(new float[] {20, 80});
+                            var t4 = new PdfPTable(new float[] { 20, 80 });
                             SetDefaults(t4);
                             t4.AddCell("Tylenol:");
                             t4.AddCell(rr.Tylenol == true ? "Yes" : "No");
@@ -156,7 +189,7 @@ namespace CmsWeb.Areas.Reports.Models
                             t4.SpacingAfter = FLOAT_t1SpacingAfter;
                             doc.Add(t4);
                         }
-                        var t5 = new PdfPTable(new float[] {45, 55});
+                        var t5 = new PdfPTable(new float[] { 45, 55 });
                         SetDefaults(t5);
 
                         if (i.o == null || SettingVisible(setting, "AskRequest"))
@@ -224,9 +257,13 @@ namespace CmsWeb.Areas.Reports.Models
                         }
                         doc.Add(Chunk.NEXTPAGE);
                     }
+                }
             }
             else
+            {
                 doc.Add(new Phrase("no data"));
+            }
+
             pageEvents.EndPageSet();
             doc.Close();
         }
@@ -234,7 +271,10 @@ namespace CmsWeb.Areas.Reports.Models
         private static bool SettingVisible(Settings setting, string name)
         {
             if (setting != null)
+            {
                 return setting.AskVisible(name);
+            }
+
             return false;
         }
 
@@ -242,7 +282,10 @@ namespace CmsWeb.Areas.Reports.Models
         {
             var rr = p.RecRegs.SingleOrDefault();
             if (rr == null)
+            {
                 rr = new RecReg();
+            }
+
             return rr;
         }
 
@@ -267,7 +310,10 @@ namespace CmsWeb.Areas.Reports.Models
             public void EndPageSet()
             {
                 if (npages == null)
+                {
                     return;
+                }
+
                 npages.BeginText();
                 npages.SetFontAndSize(font, 8);
                 npages.ShowText((writer.PageNumber + 1).ToString());
@@ -315,7 +361,7 @@ namespace CmsWeb.Areas.Reports.Models
                 len = font.GetWidthPoint(text, 8);
                 dc.BeginText();
                 dc.SetFontAndSize(font, 8);
-                dc.SetTextMatrix(document.PageSize.Width/2 - len/2, 30);
+                dc.SetTextMatrix(document.PageSize.Width / 2 - len / 2, 30);
                 dc.ShowText(text);
                 dc.EndText();
 
@@ -328,6 +374,180 @@ namespace CmsWeb.Areas.Reports.Models
                 dc.ShowText(text);
                 dc.EndText();
             }
+        }
+
+        public static DataTable ExcelData(Guid? queryid, int? orgId)
+        {
+            if (queryid == null)
+            {
+                return null;
+            }
+
+            var peopleQuery = DbUtil.Db.PeopleQuery(queryid.Value);
+            var results = (from p in peopleQuery
+                           let rr = p.RecRegs.SingleOrDefault() ?? new RecReg()
+                           let headOfHousehold = p.Family.HeadOfHousehold
+                           let headOfHouseholdSpouse = p.Family.HeadOfHouseholdSpouse
+                           orderby p.Name2
+                           select new
+                           {
+                               Person = p,
+                               RecReg = rr,
+                               HeadOfHousehold = headOfHousehold,
+                               HeadOfHouseholdSpouse = headOfHouseholdSpouse,
+                               OrgMembers = p.OrganizationMembers.SingleOrDefault(om => om.OrganizationId == orgId),
+                               p.OrganizationMembers.SingleOrDefault(om => om.OrganizationId == orgId).Organization,
+                           }).ToList();
+
+            if (!results.Any())
+            {
+                return null;
+            }
+
+            var table = new DataTable();
+
+            foreach (var x in results)
+            {
+                Settings setting = null;
+                if (x.Organization != null)
+                {
+                    setting = DbUtil.Db.CreateRegistrationSettings(x.Organization.OrganizationId);
+                }
+
+                var row = table.NewRow();
+
+                AddValue(table, row, "Name", x.Person.Name);
+                AddValue(table, row, "PrimaryAddress", x.Person.PrimaryAddress);
+                AddValue(table, row, "PrimaryAddress2", x.Person.PrimaryAddress2);
+                AddValue(table, row, "CityStateZip", x.Person.CityStateZip);
+                AddValue(table, row, "EmailAddress", x.Person.EmailAddress);
+
+                if (x.Person.HomePhone.HasValue())
+                {
+                    AddValue(table, row, "HomePhone", x.Person.HomePhone.FmtFone("H"));
+                }
+
+                if (x.Person.CellPhone.HasValue())
+                {
+                    AddValue(table, row, "CellPhone", x.Person.CellPhone.FmtFone("C"));
+                }
+
+                AddValue(table, row, "DOB", x.Person.DOB);
+                AddValue(table, row, "Grade", x.Person.Grade);
+                AddValue(table, row, "RegGrade", x?.OrgMembers?.Grade);
+
+                AddValue(table, row, "HeadOfHouseholdName", x.HeadOfHousehold?.Name);
+                if (!string.IsNullOrEmpty(x.HeadOfHousehold?.CellPhone))
+                {
+                    AddValue(table, row, "HeadOfHouseholdCellPhone", x.HeadOfHousehold?.CellPhone.FmtFone("C"));
+                }
+
+                if (!string.IsNullOrEmpty(x.HeadOfHousehold?.HomePhone))
+                {
+                    AddValue(table, row, "HeadOfHouseholdHomePhone", x.HeadOfHousehold?.HomePhone.FmtFone("H"));
+                }
+
+                AddValue(table, row, "HeadOfHouseholdSpouseName", x.HeadOfHouseholdSpouse?.Name);
+                if (!string.IsNullOrEmpty(x.HeadOfHouseholdSpouse?.CellPhone))
+                {
+                    AddValue(table, row, "HeadOfHouseholdSpouseCellPhone", x.HeadOfHouseholdSpouse?.CellPhone.FmtFone("C"));
+                }
+
+                if (!string.IsNullOrEmpty(x.HeadOfHouseholdSpouse?.HomePhone))
+                {
+                    AddValue(table, row, "HeadOfHouseholdSpouseHomePhone", x.HeadOfHouseholdSpouse?.HomePhone.FmtFone("H"));
+                }
+
+                if (x.Organization == null || SettingVisible(setting, "AskSize"))
+                {
+                    AddValue(table, row, "ShirtSize", x.RecReg.ShirtSize);
+                }
+
+                if (x.Organization == null || SettingVisible(setting, "AskRequest"))
+                {
+                    var label = ((AskRequest)setting?.AskItem("AskRequest"))?.Label ?? "Request";
+                    AddValue(table, row, label, x.OrgMembers?.Request);
+                }
+
+                AddValue(table, row, "Allergies", x.RecReg.MedicalDescription);
+
+                if (x.Organization == null || SettingVisible(setting, "AskTylenolEtc"))
+                {
+                    AddValue(table, row, "Tylenol", x.RecReg.Tylenol);
+                    AddValue(table, row, "Advil", x.RecReg.Advil);
+                    AddValue(table, row, "Robitussin", x.RecReg.Robitussin);
+                    AddValue(table, row, "Maalox", x.RecReg.Maalox);
+                }
+
+                if (x.Organization == null || SettingVisible(setting, "AskEmContact"))
+                {
+                    AddValue(table, row, "Emcontact", x.RecReg.Emcontact);
+                    AddValue(table, row, "Emphone", x.RecReg.Emphone.FmtFone());
+                }
+
+                if (x.Organization == null || SettingVisible(setting, "AskInsurance"))
+                {
+                    AddValue(table, row, "Insurance", x.RecReg.Insurance);
+                    AddValue(table, row, "Policy", x.RecReg.Policy);
+                }
+
+                if (x.Organization == null || SettingVisible(setting, "AskDoctor"))
+                {
+                    AddValue(table, row, "Doctor", x.RecReg.Doctor);
+                    AddValue(table, row, "Docphone", x.RecReg.Docphone.FmtFone());
+                }
+
+                if (x.Organization == null || SettingVisible(setting, "AskParents"))
+                {
+                    AddValue(table, row, "Mname", x.RecReg.Mname);
+                    AddValue(table, row, "Fname", x.RecReg.Fname);
+                }
+
+                if (x.OrgMembers?.OnlineRegData != null)
+                {
+                    var qlist = from qu in DbUtil.Db.ViewOnlineRegQAs
+                                where qu.OrganizationId == x.OrgMembers.OrganizationId
+                                where qu.Type == "question" || qu.Type == "text"
+                                where qu.PeopleId == x.OrgMembers.PeopleId
+                                select qu;
+                    var counter = 0;
+                    foreach (var qu in qlist)
+                    {
+                        AddValue(table, row, $"Question{counter}", qu.Question);
+                        AddValue(table, row, $"Answer{counter}", qu.Answer);
+                        counter++;
+                    }
+
+                    if (x.OrgMembers?.UserData != null)
+                    {
+                        var a = Regex.Split(x.OrgMembers.UserData, @"\s*--Add comments above this line--\s*",
+                            RegexOptions.Multiline);
+                        if (a.Length > 0)
+                        {
+                            AddValue(table, row, "Comments", a[0]);
+                        }
+                    }
+
+                    if (x.OrgMembers != null)
+                    {
+                        var groups = string.Join(", ", x.OrgMembers.OrgMemMemTags.Select(om => om.MemberTag.Name).ToArray());
+                        AddValue(table, row, "Groups", groups);
+                    }
+                }
+
+                table.Rows.Add(row);
+            }
+            return table;
+
+        }
+        private static void AddValue(DataTable table, DataRow row, string columnName, object value)
+        {
+            if (!table.Columns.Contains(columnName))
+            {
+                table.Columns.Add(columnName);
+            }
+
+            row[columnName] = value;
         }
     }
 }

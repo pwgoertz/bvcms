@@ -335,5 +335,21 @@ namespace CmsData.Finance
 
         }
 
+        public bool UseIdsForSettlementDates => false;
+        public void CheckBatchSettlements(DateTime start, DateTime end)
+        {
+            CheckBatchedTransactions.CheckBatchSettlements(db, this, start, end);
+        }
+
+        public void CheckBatchSettlements(List<string> transactionids)
+        {
+            throw new NotImplementedException();
+        }
+
+        public string VaultId(int peopleId)
+        {
+            var paymentInfo = db.PaymentInfos.Single(pp => pp.PeopleId == peopleId);
+            return paymentInfo?.BluePayCardVaultId;
+        }
     }
 }

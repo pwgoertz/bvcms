@@ -1,4 +1,6 @@
-﻿using System;
+﻿using CmsData;
+using CmsWeb.Code;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -7,18 +9,17 @@ using System.Linq;
 using System.Threading;
 using System.Web.Hosting;
 using System.Web.Mvc;
-using CmsData;
-using CmsWeb.Code;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.Dialog.Models
 {
-    public class ValidateAddress : LongRunningOp
+    public class ValidateAddress : LongRunningOperation
     {
         public const string Op = "ValidateAddress";
 
         public ValidateAddress()
         {
+            QueryId = Guid.NewGuid();
             Tag = new CodeInfo("0", "Tag");
         }
 
@@ -29,15 +30,15 @@ namespace CmsWeb.Areas.Dialog.Models
         {
             pids = FetchPeopleIds(db, Tag.Value.ToInt()).ToList();
 
-            var lop = new LongRunningOp
+            var lop = new LongRunningOperation
             {
                 Started = DateTime.Now,
                 Count = pids.Count,
                 Processed = 0,
-                Id = Id,
+                QueryId = QueryId,
                 Operation = Op,
             };
-            db.LongRunningOps.InsertOnSubmit(lop);
+            db.LongRunningOperations.InsertOnSubmit(lop);
             db.SubmitChanges();
 
             HostingEnvironment.QueueBackgroundWorkItem(ct => DoWork(this));
@@ -52,18 +53,18 @@ namespace CmsWeb.Areas.Dialog.Models
 
         public static void DoWork(ValidateAddress model)
         {
-            var db = DbUtil.Create(model.host);
+            var db = DbUtil.Create(model.Host);
             var cul = db.Setting("Culture", "en-US");
             Thread.CurrentThread.CurrentUICulture = new CultureInfo(cul);
             Thread.CurrentThread.CurrentCulture = CultureInfo.CreateSpecificCulture(cul);
 
-            LongRunningOp lop = null;
+            LongRunningOperation lop = null;
             foreach (var pid in model.pids)
             {
-                db.Dispose();
+                //DbUtil.Db.Dispose();
                 var fsb = new List<ChangeDetail>();
-                db = DbUtil.Create(model.host);
-                var f = db.LoadFamilyByPersonId(pid); 
+                //db = DbUtil.Create(model.Host);
+                var f = db.LoadFamilyByPersonId(pid);
                 var ret = AddressVerify.LookupAddress(f.AddressLineOne, f.AddressLineTwo, f.CityName, f.StateCode, f.ZipCode);
                 if (ret.found != false && !ret.error.HasValue() && ret.Line1 != "error")
                 {
@@ -80,7 +81,7 @@ namespace CmsWeb.Areas.Dialog.Models
                     f.UpdateValue(fsb, "ZipCode", f.ZipCode.Zip5());
                 }
 
-                lop = FetchLongRunningOp(db, model.Id, Op);
+                lop = FetchLongRunningOperation(db, Op, model.QueryId);
                 Debug.Assert(lop != null, "r != null");
                 lop.Processed++;
                 f.LogChanges(db, fsb, pid, Util.UserPeopleId ?? 0);
@@ -88,7 +89,7 @@ namespace CmsWeb.Areas.Dialog.Models
                 //Thread.Sleep(1000);
             }
             // finished
-            lop = FetchLongRunningOp(db, model.Id, Op);
+            lop = FetchLongRunningOperation(db, Op, model.QueryId);
             lop.Completed = DateTime.Now;
             db.SubmitChanges();
         }
@@ -106,7 +107,9 @@ namespace CmsWeb.Areas.Dialog.Models
         public void Validate(ModelStateDictionary modelState)
         {
             if (Tag != null && Tag.Value == "0") // They did not choose a tag
+            {
                 modelState.AddModelError("Tag", "Must choose a tag");
+            }
         }
 
         public bool ShowCount(CMSDataContext db)

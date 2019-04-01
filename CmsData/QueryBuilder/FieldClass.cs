@@ -133,7 +133,10 @@ namespace CmsData
         }
         public static QueryType ConvertQueryType(string type)
         {
-            return (QueryType)Enum.Parse(typeof(QueryType), type);
+            QueryType t;
+            if (Enum.TryParse(type, out t))
+                return t;
+            throw new Exception("Unknown QueryType " + type);
         }
         public static Dictionary<string, FieldClass> Fields
         {
@@ -147,7 +150,7 @@ namespace CmsData
                             select f;
                     fields = q.ToDictionary(f => f.Name, StringComparer.OrdinalIgnoreCase);
                     HttpRuntime.Cache.Insert("fields2", fields, null,
-                        DateTime.Now.AddMinutes(10), Cache.NoSlidingExpiration);
+                        Util.Now.AddMinutes(10), Cache.NoSlidingExpiration);
                 }
                 return fields;
             }

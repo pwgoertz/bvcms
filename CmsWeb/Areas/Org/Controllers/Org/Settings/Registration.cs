@@ -13,15 +13,15 @@ namespace CmsWeb.Areas.Org.Controllers
         [HttpPost]
         public ActionResult Registration(int id)
         {
-            var m = new SettingsRegistrationModel(id);
+            var m = new SettingsRegistrationModel(id, CurrentDatabase);
             return PartialView("Registration/Registration", m);
         }
 
         [HttpPost]
         public ActionResult RegistrationHelpToggle(int id)
         {
-            DbUtil.Db.ToggleUserPreference("ShowRegistrationHelp");
-            var m = new SettingsRegistrationModel(id);
+            CurrentDatabase.ToggleUserPreference("ShowRegistrationHelp");
+            var m = new SettingsRegistrationModel(id, CurrentDatabase);
             return PartialView("Registration/Registration", m);
         }
 
@@ -29,7 +29,7 @@ namespace CmsWeb.Areas.Org.Controllers
         [Authorize(Roles = "Edit")]
         public ActionResult RegistrationEdit(int id)
         {
-            var m = new SettingsRegistrationModel(id);
+            var m = new SettingsRegistrationModel(id, CurrentDatabase);
             return PartialView("Registration/RegistrationEdit", m);
         }
 
@@ -62,8 +62,8 @@ namespace CmsWeb.Areas.Org.Controllers
             if (Util.SessionTimedOut())
                 return Content("<script type='text/javascript'>window.onload = function() { parent.location = '/'; }</script>");
             Response.NoCache();
-            DbUtil.Db.SetCurrentOrgId(id);
-            var o = DbUtil.Db.LoadOrganizationById(id);
+            CurrentDatabase.SetCurrentOrgId(id);
+            var o = CurrentDatabase.LoadOrganizationById(id);
             Session["orgPickList"] = (o.OrgPickList ?? "").Split(',').Select(oo => oo.ToInt()).ToList();
             return Redirect("/SearchOrgs/" + id);
         }
@@ -71,10 +71,10 @@ namespace CmsWeb.Areas.Org.Controllers
         [HttpPost]
         public ActionResult UpdateOrgIds(int id, string list)
         {
-            DbUtil.Db.SetCurrentOrgId(id);
-            var m = new SettingsRegistrationModel(id);
+            CurrentDatabase.SetCurrentOrgId(id);
+            var m = new SettingsRegistrationModel(id, CurrentDatabase);
             m.Org.OrgPickList = list;
-            DbUtil.Db.SubmitChanges();
+            CurrentDatabase.SubmitChanges();
             return PartialView("DisplayTemplates/OrgPickList", m);
         }
     }

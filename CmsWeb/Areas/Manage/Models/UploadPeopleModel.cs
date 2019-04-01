@@ -1,519 +1,464 @@
+using CmsData;
+using CmsData.API;
+using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using CmsData;
-using CmsData.View;
-using LumenWorks.Framework.IO.Csv;
 using UtilityExtensions;
 
 namespace CmsWeb.Models
 {
     public class UploadPeopleModel
     {
-        private readonly CMSDataContext Db2;
-        private readonly string host;
-        private readonly bool noupdate;
-        private readonly int PeopleId;
-        private Dictionary<string, int> Campuses;
-        private List<ChangeDetail> fsb;
-        private Dictionary<string, int> names;
-        private List<ChangeDetail> psb;
+        internal readonly string Host;
+        internal readonly CMSDataContext JobDbContext;
+        internal readonly Dictionary<string, int> Membertypes = new Dictionary<string, int>();
+        internal readonly bool Noupdate;
+        internal readonly Dictionary<string, int> Orgs = new Dictionary<string, int>();
+        internal readonly int PeopleId;
+        internal readonly CMSDataContext ProgressDbContext;
 
-        public UploadPeopleModel(string host, int PeopleId, bool noupdate, bool testing = false)
+        internal readonly List<string> Standardnames = new List<string>
         {
-            Db2 = DbUtil.Create(host);
-            this.PeopleId = PeopleId;
-            this.noupdate = noupdate;
-            this.testing = testing;
-            this.host = host;
-        }
-
-        private void UpdateField(Family f, string[] a, string prop, string s)
-        {
-            if (names.ContainsKey(s))
-                if (a[names[s]].HasValue())
-                    f.UpdateValue(fsb, prop, a[names[s]]);
-        }
-
-        private void UpdateField(Person p, string[] a, string prop, string s)
-        {
-            if (names.ContainsKey(s))
-                if (a[names[s]].HasValue())
-                    p.UpdateValue(psb, prop, a[names[s]]);
-        }
-
-        private void UpdateField(Person p, string[] a, string prop, string s, object value)
-        {
-            if (names.ContainsKey(s))
-                if (value != null)
-                    p.UpdateValue(psb, prop, value);
-        }
-
-        private void SetField(Family f, string[] a, string prop, string s)
-        {
-            if (names.ContainsKey(s))
-                if (a[names[s]].HasValue())
-                    Util.SetProperty(f, prop, a[names[s]]);
-        }
-
-        private void SetField(Person p, string[] a, string prop, string s)
-        {
-            if (names.ContainsKey(s))
-                if (a[names[s]].HasValue())
-                    Util.SetProperty(p, prop, a[names[s]]);
-        }
-
-        private void SetField(Person p, string[] a, string prop, string s, object value)
-        {
-            if (names.ContainsKey(s))
-                if (value != null)
-                    Util.SetProperty(p, prop, value);
-        }
-
-        private void SetField(Family f, string[] a, string prop, string s, object value)
-        {
-            if (names.ContainsKey(s))
-                if (value != null)
-                    Util.SetProperty(f, prop, value);
-        }
-
-        private string GetDigits(string[] a, string s)
-        {
-            if (names.ContainsKey(s))
-                if (a[names[s]].HasValue())
-                    return a[names[s]].GetDigits();
-            return "";
-        }
-
-        private DateTime? GetDate(Person p, string[] a, string s)
-        {
-            if (names.ContainsKey(s))
-                if (a[names[s]].HasValue())
-                {
-                    DateTime dt;
-                    if (DateTime.TryParse(a[names[s]], out dt))
-                    {
-                        if (dt.Year < 1800)
-                            throw new Exception($"error on {p.FirstName} {p.LastName}: [{names[s]}]({a[names[s]]})");
-                        return dt;
-                    }
-                }
-            return null;
-        }
-
-        private int Gender(string[] a)
-        {
-            if (names.ContainsKey("gender"))
-                if (a[names["gender"]].HasValue())
-                {
-                    var v = a[names["gender"]].ToLower().TrimEnd();
-                    switch (v)
-                    {
-                        case "male":
-                        case "m":
-                            return 1;
-                        case "female":
-                        case "f":
-                            return 2;
-                    }
-                }
-            return 0;
-        }
-
-        private int Marital(string[] a)
-        {
-            if (names.ContainsKey("marital"))
-                if (a[names["marital"]].HasValue())
-                {
-                    var v = a[names["marital"]].ToLower().TrimEnd();
-                    switch (v)
-                    {
-                        case "married":
-                        case "m":
-                            return 20;
-                        case "single":
-                        case "s":
-                            return 10;
-                        case "widowed":
-                        case "w":
-                            return 50;
-                        case "divorced":
-                        case "d":
-                            return 40;
-                        case "separated":
-                            return 30;
-                    }
-                }
-            return 0;
-        }
-
-        private string Title(string[] a)
-        {
-            if (names.ContainsKey("title"))
-                if (a[names["title"]].HasValue())
-                    return a[names["title"]].Truncate(10).TrimEnd();
-            return null;
-        }
-
-        private int Position(string[] a)
-        {
-            if (names.ContainsKey("position"))
-                if (a[names["position"]].HasValue())
-                {
-                    var v = a[names["position"]].ToLower().TrimEnd();
-                    switch (v)
-                    {
-                        case "primary":
-                            return 10;
-                        case "secondary":
-                            return 20;
-                        case "child":
-                            return 30;
-                    }
-                }
-            return 10;
-        }
-
-        private int? Campus(string[] a)
-        {
-            if (names.ContainsKey("campus"))
-                if (a[names["campus"]].HasValue())
-                    return Campuses[a[names["campus"]]];
-            return null;
-        }
-
-        private List<string> standardnames = new List<string>
-        {
-            "familyid", "title", "first", "last", "goesby", "altname",
-            "gender", "marital", "maidenName", "address", "address2",
-            "city", "state", "zip", "position", "birthday",
-            "cellphone", "homephone", "workphone", "email", "email2",
-            "suffix", "middle", "joindate", "dropdate", "baptismdate", "weddingdate",
-            "memberstatus", "employer", "occupation", "CreatedDate", "BackgroundCheck"
+            "familyid", "title", "first", "last", "goesby", "altname", "gender", "marital", "maidenName", "address",
+            "address2", "city", "state", "zip", "position", "birthday", "deceased", "cellphone", "homephone", "workphone", "email",
+            "email2", "suffix", "middle", "joindate", "dropdate", "baptismdate", "weddingdate", "memberstatus", "employer",
+            "occupation", "CreatedDate", "BackgroundCheck", "individualid", "campus"
         };
 
-        private readonly List<string> standardrecregnames = new List<string>
+        internal readonly List<string> Standardrecregnames = new List<string>
         {
-            "Mother", "Father", "EmContact", "EmPhone", "Allergies",
-            "Grade", "School", "Doctor", "DocPhone", "Insurance", "Policy",
+            "Mother", "Father", "EmContact", "EmPhone", "Allergies", "Grade", "School", "Doctor", "DocPhone",
+            "Insurance", "Policy"
         };
 
-        readonly Dictionary<string, int> orgs = new Dictionary<string, int>();
-        readonly Dictionary<string, int> membertypes = new Dictionary<string, int>();
-        private List<string> extravaluenames;
-        private List<string> recregnames;
-        public bool testing;
+        internal Dictionary<string, int> Campuses;
+        internal List<dynamic> Datalist;
+        internal Dictionary<string, string> Evtypes;
+        internal List<string> Extravaluenames;
+        internal List<ChangeDetail> Fsb;
+        internal Dictionary<string, int> Names;
+        internal List<ChangeDetail> Psb;
+        internal List<string> Recregnames;
+        public bool Testing;
 
-        public bool DoUpload(string text)
+        public UploadPeopleModel()
         {
-            var rt = Db2.UploadPeopleRuns.OrderByDescending(mm => mm.Id).First();
-            var sep = text.First(vv => new char[] {'\t', ','}.Contains(vv));
-            var csv = new CsvReader(new StringReader(text), false, sep);
-            csv.SupportsMultiline = true;
-            var list = csv.ToList();
+        }
 
-            var list0 = list.First().Select(kk => kk).ToList();
-            names = list0.ToDictionary(i => i.TrimEnd(),
-                i => list0.FindIndex(s => s == i), StringComparer.OrdinalIgnoreCase);
+        public UploadPeopleModel(string host, int peopleId, bool noupdate, bool testing = false)
+        {
+            JobDbContext = DbUtil.Create(host);
+            ProgressDbContext = DbUtil.Create(host);
+            PeopleId = peopleId;
+            Noupdate = noupdate;
+            Testing = testing;
+            Host = host;
+            PeopleSheetName = "People";
+        }
 
-            extravaluenames = (from name in names.Keys
-                               where !standardnames.Contains(name, StringComparer.OrdinalIgnoreCase)
-                               where !standardrecregnames.Contains(name)
-                               select name).ToList();
-            recregnames = (from name in names.Keys
-                           where standardrecregnames.Contains(name)
-                           select name).ToList();
+        public UploadPeopleModel(CMSDataContext existingProgressDbContext, string host, int peopleId, bool noupdate, bool testing = false)
+        {
+            JobDbContext = DbUtil.Create(host);
+            ProgressDbContext = existingProgressDbContext;
+            PeopleId = peopleId;
+            Noupdate = noupdate;
+            Testing = testing;
+            Host = host;
+            PeopleSheetName = "People";
+        }
 
-            var db = DbUtil.Create(host);
-            if (names.ContainsKey("campus"))
+        public bool InsertPeopleSpreadsheet
+        {
+            get { return true; }
+        }
+
+        internal string PeopleSheetName { get; set; }
+
+        public virtual bool DoUpload(ExcelPackage pkg)
+        {
+            var rt = ProgressDbContext.UploadPeopleRuns.OrderByDescending(mm => mm.Id).First();
+            var ws = pkg.Workbook.Worksheets[PeopleSheetName];
+            FetchData(pkg.Workbook.Worksheets[PeopleSheetName]);
+
+            UploadPeople(rt, ws);
+
+            rt.Completed = DateTime.Now;
+            ProgressDbContext.SubmitChanges();
+
+            return true;
+        }
+
+        internal void UploadPeople(UploadPeopleRun rt, ExcelWorksheet ws)
+        {
+            Extravaluenames = (from name in Names
+                               where !Standardnames.Contains(name.Key, StringComparer.OrdinalIgnoreCase)
+                               where !Standardrecregnames.Contains(name.Key)
+                               select name.Key).ToList();
+
+            Recregnames = (from name in Names
+                           where Standardrecregnames.Contains(name.Key)
+                           select name.Key).ToList();
+
+            if (Names.ContainsKey("Campus"))
             {
-                var campuslist = (from li in list.Skip(1)
-                                  where li.Length == names.Count
-                                  group li by li[names["campus"]]
-                                  into campus
+                var campuslist = (from li in Datalist
+                                  group li by (string)li.Campus
+                    into campus
                                   where campus.Key.HasValue()
                                   select campus.Key).ToList();
                 var dbc = from c in campuslist
-                          join cp in db.Campus on c equals cp.Description into j
+                          join cp in JobDbContext.Campus on c equals cp.Description into j
                           from cp in j.DefaultIfEmpty()
-                          select new {cp, c};
+                          select new { cp, c };
                 var clist = dbc.ToList();
                 if (clist.Count > 0)
                 {
                     var maxcampusid = 0;
-                    if (db.Campus.Any())
-                        maxcampusid = db.Campus.Max(c => c.Id);
+                    if (JobDbContext.Campus.Any())
+                    {
+                        maxcampusid = JobDbContext.Campus.Max(c => c.Id);
+                    }
+
                     foreach (var i in clist)
-                        if (i.cp == null)
+                    {
+                        if (i.cp != null)
                         {
-                            var cp = new Campu {Description = i.c, Id = ++maxcampusid};
-                            if (!testing)
-                                db.Campus.InsertOnSubmit(cp);
+                            continue;
                         }
+
+                        var cp = new Campu { Description = i.c, Id = ++maxcampusid };
+                        if (!Testing)
+                        {
+                            JobDbContext.Campus.InsertOnSubmit(cp);
+                        }
+                    }
                 }
             }
-            var now = DateTime.Now;
-            if (!testing)
-                db.SubmitChanges();
-            Campuses = db.Campus.ToDictionary(cp => cp.Description, cp => cp.Id);
 
-            var q = (from li in list.Skip(1)
-                     where li.Length == names.Count
-                     group li by li[names["familyid"]]
-                     into fam
+            if (!Testing)
+            {
+                JobDbContext.SubmitChanges();
+            }
+
+            Campuses = JobDbContext.Campus.ToDictionary(cp => cp.Description, cp => cp.Id);
+
+            var q = (from li in Datalist
+                     group li by li.FamilyId
+                into fam
                      select fam).ToList();
             rt.Count = q.Sum(ff => ff.Count());
-            Db2.SubmitChanges();
+            rt.Description = $"Uploading People {(Testing ? "in testing mode" : "for real")}";
+            ProgressDbContext.SubmitChanges();
 
             foreach (var fam in q)
             {
-                Family f = null;
                 var prevpid = 0;
 
-                FindPerson3 pid;
-                Person p = null;
                 foreach (var a in fam)
                 {
-                    if (!testing)
+                    if (!Testing)
                     {
-                        db.SubmitChanges();
-                        db.Dispose();
-                        db = DbUtil.Create(host);
+                        JobDbContext.SubmitChanges();
                     }
 
+                    Family f = null;
                     var potentialdup = false;
-                    var first = a[names["first"]];
-                    var last = a[names["last"]];
-                    DateTime dt;
-                    DateTime? dob = null;
-                    if (names.ContainsKey("birthday"))
-                        if (DateTime.TryParse(a[names["birthday"]], out dt))
-                        {
-                            dob = dt;
-                            if (dob.Value < SqlDateTime.MinValue)
-                                dob = null;
-                        }
-                    string email = null;
-                    string cell = null;
-                    string homephone = null;
-                    if (names.ContainsKey("email"))
-                        email = a[names["email"]].Trim();
-                    if (names.ContainsKey("cellphone"))
-                        cell = a[names["cellphone"]].GetDigits();
-                    if (names.ContainsKey("homephone"))
-                        homephone = a[names["homephone"]].GetDigits();
-                    pid = db.FindPerson3(first, last, dob, email, cell, homephone, null).FirstOrDefault();
-
-                    if (noupdate && pid != null)
+                    int? pid = FindRecord(JobDbContext, a, ref potentialdup);
+                    if (pid == -1) // no data: no first or last name
                     {
-                        if (!testing)
-                        {
-                            var pd = db.LoadPersonById(pid.PeopleId.Value);
-                            pd.AddEditExtraBool("FoundDup", true);
-                        }
-                        potentialdup = true;
-                        pid = null;
+                        continue;
                     }
-                    if (pid != null) // found
+
+                    var p = pid.HasValue
+                        ? UpdateRecord(JobDbContext, pid.Value, a)
+                        : NewRecord(JobDbContext, ref f, a, prevpid, potentialdup);
+                    prevpid = p.PeopleId;
+
+                    if (Recregnames.Any())
                     {
-                        p = db.LoadPersonById(pid.PeopleId.Value);
-                        prevpid = p.PeopleId;
-                        psb = new List<ChangeDetail>();
-                        fsb = new List<ChangeDetail>();
-
-                        UpdateField(p, a, "TitleCode", "title");
-                        UpdateField(p, a, "FirstName", "first");
-                        UpdateField(p, a, "NickName", "goesby");
-                        UpdateField(p, a, "LastName", "last");
-                        UpdateField(p, a, "EmailAddress", "email");
-                        UpdateField(p, a, "EmailAddress2", "email2");
-                        UpdateField(p, a, "DOB", "birthday");
-                        UpdateField(p, a, "AltName", "altname");
-                        UpdateField(p, a, "SuffixCode", "suffix");
-                        UpdateField(p, a, "MiddleName", "middle");
-
-                        UpdateField(p, a, "CellPhone", "cellphone", GetDigits(a, "cellphone"));
-                        UpdateField(p, a, "WorkPhone", "workphone", GetDigits(a, "workphone"));
-                        UpdateField(p, a, "GenderId", "gender", Gender(a));
-                        UpdateField(p, a, "MaritalStatusId", "marital", Marital(a));
-                        UpdateField(p, a, "PositionInFamilyId", "position", Position(a));
-                        if (!testing)
-                            UpdateField(p, a, "CampusId", "campus", Campus(a));
-
-                        UpdateField(p.Family, a, "AddressLineOne", "address");
-                        UpdateField(p.Family, a, "AddressLineTwo", "address2");
-                        UpdateField(p.Family, a, "CityName", "city");
-                        UpdateField(p.Family, a, "StateCode", "state");
-                        UpdateField(p.Family, a, "ZipCode", "zip");
-
-                        if (names.ContainsKey("memberstatus"))
-                            UpdateMemberStatus(db, p, a);
-
-                        if (!testing)
-                        {
-                            p.LogChanges(db, psb, PeopleId);
-                            p.Family.LogChanges(db, fsb, p.PeopleId, PeopleId);
-                            db.SubmitChanges();
-                            p.AddEditExtraBool("InsertPeopleUpdated", true);
-                        }
-                    }
-                    else // new person
-                    {
-                        if(!testing)
-                            if (prevpid > 0)
-                                f = db.LoadFamilyByPersonId(prevpid);
-
-                        if (f == null || !a[names["familyid"]].HasValue())
-                        {
-                            f = new Family();
-                            SetField(f, a, "AddressLineOne", "address");
-                            SetField(f, a, "AddressLineTwo", "address2");
-                            SetField(f, a, "CityName", "city");
-                            SetField(f, a, "StateCode", "state");
-                            SetField(f, a, "ZipCode", "zip");
-                            SetField(f, a, "HomePhone", "homephone", GetDigits(a, "homephone"));
-                            db.Families.InsertOnSubmit(f);
-                            if (!testing)
-                                db.SubmitChanges();
-                        }
-
-                        string goesby = null;
-                        if (names.ContainsKey("goesby"))
-                            goesby = a[names["goesby"]];
-                        p = Person.Add(db, false, f, 10, null,
-                            a[names["first"]],
-                            goesby,
-                            a[names["last"]],
-                            dob.FormatDate(),
-                            0, 0, 0, null, testing);
-                        prevpid = p.PeopleId;
-                        p.FixTitle();
-
-                        SetField(p, a, "AltName", "altname");
-                        SetField(p, a, "SuffixCode", "suffix");
-                        SetField(p, a, "MiddleName", "middle");
-                        SetField(p, a, "MaidenName", "maidenname");
-                        SetField(p, a, "EmployerOther", "employer");
-                        SetField(p, a, "OccupationOther", "occupation");
-                        SetField(p, a, "CellPhone", "cellphone", GetDigits(a, "cellphone"));
-                        SetField(p, a, "WorkPhone", "workphone", GetDigits(a, "workphone"));
-                        SetField(p, a, "EmailAddress", "email");
-                        SetField(p, a, "EmailAddress2", "email2");
-                        SetField(p, a, "GenderId", "gender", Gender(a));
-                        SetField(p, a, "MaritalStatusId", "marital", Marital(a));
-                        SetField(p, a, "WeddingDate", "weddingdate", GetDate(p, a, "weddingdate"));
-                        SetField(p, a, "JoinDate", "joindate", GetDate(p, a, "joindate"));
-                        SetField(p, a, "DropDate", "dropdate", GetDate(p, a, "dropdate"));
-                        SetField(p, a, "BaptismDate", "baptismdate", GetDate(p, a, "baptismdate"));
-                        SetField(p, a, "PositionInFamilyId", "position", Position(a));
-                        SetField(p, a, "TitleCode", "title", Title(a));
-                        if (names.ContainsKey("memberstatus"))
-                            SetMemberStatus(db, p, a);
-                        if (!testing)
-                        {
-                            SetField(p, a, "CampusId", "campus", Campus(a));
-                            p.AddEditExtraBool("InsertPeopleAdded", true);
-                            if (potentialdup)
-                                p.AddEditExtraBool("FoundDup", true);
-                            db.SubmitChanges();
-                        }
-                    }
-                    if (names.ContainsKey("createddate"))
-                        SetCreatedDate(p, a);
-                    if (names.ContainsKey("backgroundcheck"))
-                        SetBackgroundCheckDate(db, p, a);
-
-                    if (recregnames.Any())
                         SetRecRegs(p, a);
+                    }
 
-                    if (extravaluenames.Any())
-                        ProcessExtraValues(db, p, a);
+                    if (Extravaluenames.Any())
+                    {
+                        ProcessExtraValues(JobDbContext, p, a);
+                    }
 
                     rt.Processed++;
-                    Db2.SubmitChanges();
+                    ProgressDbContext.SubmitChanges();
                 }
-                if (!testing)
-                    db.SubmitChanges();
+
+                if (!Testing)
+                {
+                    JobDbContext.SubmitChanges();
+                }
             }
-            rt.Completed = DateTime.Now;
-            Db2.SubmitChanges();
-            return true;
         }
 
-        private void ProcessExtraValues(CMSDataContext db, Person p, string[] a)
+        internal Person UpdateRecord(CMSDataContext db, int pid, dynamic a)
         {
-            if (!extravaluenames.Any())
-                return;
+            var p = db.LoadPersonById(pid);
+            Psb = new List<ChangeDetail>();
+            Fsb = new List<ChangeDetail>();
 
+            UpdateField(p, "TitleCode", a.Title);
+            UpdateField(p, "FirstName", a.First);
+            UpdateField(p, "NickName", a.Goesby);
+            UpdateField(p, "LastName", a.Last);
+            UpdateField(p, "EmailAddress", a.Email);
+            UpdateField(p, "EmailAddress2", a.Email2);
 
-            foreach (var name in extravaluenames)
+            DateTime? dob = GetDate(a.Birthday);
+            var dobstr = dob.FormatDate();
+            UpdateField(p, "DOB", dobstr);
+            UpdateField(p, "AltName", GetString(a.AltName));
+            UpdateField(p, "SuffixCode", GetString(a.Suffix));
+            UpdateField(p, "MiddleName", GetString(a.Middle));
+
+            UpdateField(p, "CellPhone", GetDigits(a.CellPhone));
+            UpdateField(p, "WorkPhone", GetDigits(a.WorkPhone));
+            UpdateField(p, "GenderId", Gender(a.Gender));
+            UpdateField(p, "MaritalStatusId", Marital(a.Marital));
+            UpdateField(p, "PositionInFamilyId", Position(a.Position));
+            if (!Testing)
             {
-                var b = name.Split('.');
-                if (name.EndsWith(".txt"))
-                    p.AddEditExtraText(b[0], a[names[name]].Trim());
-                else if (name.EndsWith(".org"))
-                {
+                UpdateField(p, "CampusId", Campus(a.Campus));
+            }
 
-                    if (testing)
-                        continue;
-                    var d = a[names[name]].Trim().Trim();
-                    if (!d.HasValue())
-                        continue;
-                    if (d == "TRUE")
-                        d = "Member";
-                    var oid = 0;
-                    if (orgs.ContainsKey(b[0]))
-                        oid = orgs[b[0]];
-                    else
-                    {
-                        var prog = Organization.FetchOrCreateProgram(db, "InsertPeople");
-                        var div = Organization.FetchOrCreateDivision(db, prog, "InsertPeople");
-                        var o = Organization.FetchOrCreateOrganization(db, div, b[0].SplitUpperCaseToString());
-                        oid = o.OrganizationId;
-                        orgs.Add(b[0], oid);
-                    }
-                    var mtid = 0;
-                    if (membertypes.ContainsKey(d))
-                        mtid = membertypes[d];
-                    else
-                    {
-                        var mt = Organization.FetchOrCreateMemberType(db, d);
-                        mtid = mt.Id;
-                        membertypes.Add(d, mtid);
-                    }
-                    OrganizationMember.InsertOrgMembers(db, oid, p.PeopleId, mtid, DateTime.Today, null, false);
-                }
-                else if (name.EndsWith(".dt"))
+            UpdateField(p.Family, "AddressLineOne", GetString(a.Address));
+            UpdateField(p.Family, "AddressLineTwo", GetString(a.Address2));
+            UpdateField(p.Family, "CityName", GetString(a.City));
+            UpdateField(p.Family, "StateCode", GetString(a.State));
+            UpdateField(p.Family, "ZipCode", GetString(a.Zip));
+
+            UpdateMemberStatus(db, p, a.MemberStatus);
+
+            if (Testing)
+            {
+                return p;
+            }
+
+            p.LogChanges(db, Psb, PeopleId);
+            p.Family.LogChanges(db, Fsb, p.PeopleId, PeopleId);
+            db.SubmitChanges();
+            p.AddEditExtraBool("InsertPeopleUpdated", true);
+
+            return p;
+        }
+
+        internal Person NewRecord(CMSDataContext db, ref Family f, dynamic a, int prevpid, bool potentialdup)
+        {
+            if (!Testing)
+            {
+                if (prevpid > 0)
                 {
-                    var d = a[names[name]].Trim().ToDate();
-                    if (d.HasValue)
-                        p.AddEditExtraDate(b[0], d.Value);
+                    f = db.LoadFamilyByPersonId(prevpid);
                 }
-                else if (name.EndsWith(".int"))
-                    p.AddEditExtraInt(b[0], a[names[name]].Trim().ToInt());
-                else if (name.EndsWith(".bit"))
+            }
+
+            if (f == null)
+            {
+                f = new Family
                 {
-                    var v = a[names[name]];
-                    if (v.HasValue())
-                        p.AddEditExtraBool(b[0], v.ToInt() == 1);
+                    AddressLineOne = GetString(a.Address),
+                    AddressLineTwo = GetString(a.Address2),
+                    CityName = GetString(a.City),
+                    StateCode = GetString(a.State),
+                    ZipCode = GetString(a.Zip),
+                    HomePhone = GetDigits(a.HomePhone)
+                };
+                db.Families.InsertOnSubmit(f);
+
+                if (!Testing)
+                {
+                    db.SubmitChanges();
                 }
-                else
-                    p.AddEditExtraCode(name, a[names[name]].Trim());
+            }
+
+            DateTime? dob = GetDate(a.Birthday);
+            var dobstr = dob.FormatDate();
+
+            var p = Person.Add(db, false, f, 10, null,
+                (string)a.First,
+                (string)a.GoesBy,
+                (string)a.Last,
+                dobstr,
+                0, 0, 0, null, Testing);
+            p.FixTitle();
+
+            p.AltName = GetString(a.AltName);
+            p.SuffixCode = GetString(a.Suffix);
+            p.MiddleName = GetString(a.Middle);
+            p.MaidenName = GetString(a.MaidenName);
+            p.EmployerOther = GetString(a.Employer);
+            p.OccupationOther = GetString(a.Occupation);
+
+            p.EmailAddress = GetStringTrimmed(a.Email);
+            p.EmailAddress2 = GetStringTrimmed(a.Email2);
+
+            p.CellPhone = GetDigits(a.CellPhone);
+            p.WorkPhone = GetDigits(a.WorkPhone);
+
+            p.TitleCode = Title(a.Title);
+            p.GenderId = Gender(a.Gender);
+            p.MaritalStatusId = Marital(a.Marital);
+            p.PositionInFamilyId = Position(a.Position);
+            SetMemberStatus(db, p, a.MemberStatus);
+
+            p.WeddingDate = GetDate(a.WeddingDate);
+            p.JoinDate = GetDate(a.JoinDate);
+            p.DropDate = GetDate(a.DropDate);
+            p.BaptismDate = GetDate(a.BaptismDate);
+
+            StoreIds(p, a);
+
+            if (Testing)
+            {
+                return p;
+            }
+
+            p.CampusId = Campus(a.Campus);
+            p.AddEditExtraBool("InsertPeopleAdded", true);
+            if (potentialdup)
+            {
+                p.AddEditExtraBool("FoundDup", true);
+            }
+
+            db.SubmitChanges();
+
+            return p;
+        }
+
+        internal virtual void StoreIds(Person p, dynamic a)
+        {
+        }
+
+        internal void ProcessExtraValues(CMSDataContext db, Person p, dynamic a)
+        {
+            if (!Extravaluenames.Any())
+            {
+                return;
+            }
+
+            foreach (var name in Extravaluenames)
+            {
+                object o = a.GetValue(name);
+                var vs = o as string;
+                string type = null;
+                if (!Evtypes.TryGetValue(name, out type))
+                {
+                    p.AddEditExtraCode(name, ((string)a[name])?.Trim());
+                    continue;
+                }
+
+                switch (type)
+                {
+                    case "fam":
+                        p.Family.AddEditExtraCode(name, ((string)a[name])?.Trim());
+                        break;
+                    case "txt":
+                        p.AddEditExtraText(name, $"{a[name]}".Trim());
+                        break;
+                    case "org":
+
+                        if (Testing)
+                        {
+                            continue;
+                        }
+
+                        var d = ((string)a[name])?.Trim();
+                        if (!d.HasValue())
+                        {
+                            continue;
+                        }
+
+                        if (d.Equal("true"))
+                        {
+                            d = "Member";
+                        }
+
+                        var oid = 0;
+                        if (Orgs.ContainsKey(name))
+                        {
+                            oid = Orgs[name];
+                        }
+                        else
+                        {
+                            var prog = Organization.FetchOrCreateProgram(db, "InsertPeople");
+                            var div = Organization.FetchOrCreateDivision(db, prog, "InsertPeople");
+                            var org = Organization.FetchOrCreateOrganization(db, div, name.SplitUpperCaseToString());
+                            oid = org.OrganizationId;
+                            Orgs.Add(name, oid);
+                        }
+
+                        var mtid = 0;
+                        if (Membertypes.ContainsKey(d))
+                        {
+                            mtid = Membertypes[d];
+                        }
+                        else
+                        {
+                            var mt = Organization.FetchOrCreateMemberType(db, d);
+                            mtid = mt.Id;
+                            Membertypes.Add(d, mtid);
+                        }
+
+                        OrganizationMember.InsertOrgMembers(db, oid, p.PeopleId, mtid, DateTime.Today, null, false);
+                        break;
+                    case "dt":
+                        if (o is DateTime)
+                        {
+                            p.AddEditExtraDate(name, (DateTime)o);
+                        }
+
+                        var dt = o.ToDate();
+                        if (dt == null)
+                        {
+                            continue;
+                        }
+
+                        p.AddEditExtraDate(name, dt);
+                        break;
+                    case "int":
+                        var i = GetInt(o);
+                        if (i.HasValue)
+                        {
+                            p.AddEditExtraInt(name, i.Value);
+                        }
+
+                        break;
+                    case "bit":
+                        p.AddEditExtraBool(name, IsTrue(o));
+                        break;
+                }
             }
         }
 
-        private void SetRecRegs(Person p, string[] a)
+        private static bool IsTrue(object arg)
         {
-            var nq = (from name in names.Keys
-                      where standardrecregnames.Contains(name, StringComparer.OrdinalIgnoreCase)
+            switch (arg)
+            {
+                case null:
+                    return false;
+                case int _ when (int)arg != 0:
+                case double _ when arg.ToInt() != 0:
+                    return true;
+            }
+
+            return arg.ToString().Equal("true") || arg.ToString().Equal("1");
+        }
+
+        internal void SetRecRegs(Person p, dynamic a)
+        {
+            var nq = (from name in Names.Keys
+                      where Standardrecregnames.Contains(name, StringComparer.OrdinalIgnoreCase)
                       select name).ToList();
             foreach (var name in nq)
             {
                 var rr = p.SetRecReg();
-                var value = a[names[name]].Trim();
+                string value = GetStringTrimmed(a.GetValue(name));
                 switch (name)
                 {
                     case "Mother":
@@ -553,65 +498,287 @@ namespace CmsWeb.Models
             }
         }
 
-        private void SetCreatedDate(Person p, string[] a)
+        internal void SetMemberStatus(CMSDataContext db, Person p, object o)
         {
-            var value = a[names["createddate"]];
-            p.CreatedDate = value.ToDate();
-        }
-
-        private void SetMemberStatus(CMSDataContext db, Person p, string[] a)
-        {
-            var ms = a[names["memberstatus"]];
-            var qms = from mm in db.MemberStatuses
-                      where mm.Description == ms
-                      select mm;
-            var m = qms.SingleOrDefault();
-            if (m == null)
+            var s = o as string;
+            if (!s.HasValue())
             {
-                var nx = db.MemberStatuses.Max(mm => mm.Id) + 1;
-                m = new MemberStatus {Id = nx, Description = ms, Code = nx.ToString()};
-                db.MemberStatuses.InsertOnSubmit(m);
-            }
-            SetField(p, a, "MemberStatusId", "memberstatus", m.Id);
-        }
-
-        private void UpdateMemberStatus(CMSDataContext db, Person p, string[] a)
-        {
-            var ms = a[names["memberstatus"]];
-            var qms = from mm in db.MemberStatuses
-                      where mm.Description == ms
-                      select mm;
-            var m = qms.SingleOrDefault();
-            if (m == null)
-            {
-                var nx = db.MemberStatuses.Max(mm => mm.Id) + 1;
-                m = new MemberStatus {Id = nx, Description = ms, Code = nx.ToString()};
-                db.MemberStatuses.InsertOnSubmit(m);
-            }
-            UpdateField(p, a, "MemberStatusId", "memberstatus", m.Id);
-        }
-
-        private void SetBackgroundCheckDate(CMSDataContext db, Person p, string[] a)
-        {
-            var value = a[names["backgroundcheck"]];
-            var ckdt = value.ToDate();
-            if (ckdt.HasValue)
-                SetBackgroundCheckDate(db, p, ckdt);
-        }
-
-        private void SetBackgroundCheckDate(CMSDataContext db, Person p, DateTime? dt)
-        {
-            if (!dt.HasValue)
                 return;
-            var v = p.Volunteers.SingleOrDefault();
-            if (v == null)
-            {
-                v = new Volunteer {PeopleId = p.PeopleId};
-                db.Volunteers.InsertOnSubmit(v);
             }
-            v.Standard = true;
-            v.StatusId = 10;
-            v.ProcessedDate = dt;
+
+            var qms = from mm in db.MemberStatuses
+                      where mm.Description == s
+                      select mm;
+            var m = qms.SingleOrDefault();
+            if (m == null)
+            {
+                var nx = db.MemberStatuses.Max(mm => mm.Id) + 1;
+                m = new MemberStatus { Id = nx, Description = s, Code = nx.ToString() };
+                db.MemberStatuses.InsertOnSubmit(m);
+            }
+
+            p.MemberStatusId = m.Id;
+        }
+
+        internal void UpdateMemberStatus(CMSDataContext db, Person p, object o)
+        {
+            var ms = o as string;
+            if (ms == null)
+            {
+                return;
+            }
+
+            var qms = from mm in db.MemberStatuses
+                      where mm.Description == ms
+                      select mm;
+            var m = qms.SingleOrDefault();
+            if (m == null)
+            {
+                var nx = db.MemberStatuses.Max(mm => mm.Id) + 1;
+                m = new MemberStatus { Id = nx, Description = ms, Code = nx.ToString() };
+                db.MemberStatuses.InsertOnSubmit(m);
+            }
+
+            p.UpdateValue("MemberStatusId", m.Id);
+        }
+
+        public void FetchData(ExcelWorksheet ws)
+        {
+            FetchHeaderColumns(ws);
+
+            var r = 2;
+            Datalist = new List<dynamic>();
+            while (r <= ws.Dimension.End.Row)
+            {
+                var dict = new Dictionary<string, object>();
+                foreach (var kv in Names)
+                {
+                    dict[kv.Key] = ws.Cells[r, kv.Value].Value;
+                }
+
+                Datalist.Add(new DynamicData(dict));
+                r++;
+            }
+        }
+
+        public void FetchHeaderColumns(ExcelWorksheet sheet)
+        {
+            Names = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            Evtypes = new Dictionary<string, string>();
+            var n = 0;
+            foreach (var c in sheet.Cells[1, 1, 1, sheet.Dimension.End.Column])
+            {
+                n++;
+                if (!c.Text.HasValue())
+                {
+                    continue;
+                }
+
+                var colname = c.Text;
+                if (colname.Equal("IndividualId") && colname != "IndividualId")
+                {
+                    throw new Exception($"Must Use IndividualId, not {colname}, case sensitive");
+                }
+
+                if (colname.Equal("FamilyId") && colname != "FamilyId")
+                {
+                    throw new Exception($"Must Use FamilyId, not {colname}, case sensitive");
+                }
+
+                var b = colname.SplitStr(".", 2);
+                if (b.Length > 1)
+                {
+                    Evtypes[b[0]] = b[1];
+                    colname = b[0];
+                }
+
+                Names.Add(colname, n);
+            }
+        }
+
+        internal void CheckColumn(string name, string sheet)
+        {
+            if (!Names.ContainsKey(name))
+            {
+                throw new Exception($"Missing {name} column on {sheet} sheet");
+            }
+        }
+
+        internal virtual int? GetPeopleId(dynamic a)
+        {
+            return null;
+        }
+
+        internal int? FindRecord(CMSDataContext db, dynamic a, ref bool potentialdup)
+        {
+            var id = (int?)GetPeopleId(a);
+            if (id > 0)
+            {
+                return id; // existing person's PeopleId
+            }
+
+            var first = a.First as string;
+            var last = a.Last as string;
+            if (!first.HasValue() && !last.HasValue())
+            {
+                return -1;
+            }
+
+            DateTime? dt = GetDate(a.Birthday);
+            string email = GetStringTrimmed(a.Email);
+            string cell = GetDigits(a.CellPhone);
+            string home = GetDigits(a.HomePhone);
+
+            var pid = db.FindPerson3(first, last, dt, email, cell, home, null).FirstOrDefault();
+
+            if (!Noupdate || pid?.PeopleId == null)
+            {
+                return pid?.PeopleId;
+            }
+
+            if (!Testing)
+            {
+                var pd = db.LoadPersonById(pid.PeopleId.Value);
+                pd.AddEditExtraBool("FoundDup", true);
+            }
+
+            potentialdup = true;
+            pid = null;
+
+            return pid?.PeopleId;
+        }
+
+        internal void UpdateField(Family f, string prop, object o)
+        {
+            if (o != null)
+            {
+                f.UpdateValue(Fsb, prop, o);
+            }
+        }
+
+        internal void UpdateField(Person p, string prop, object o)
+        {
+            if (o != null)
+            {
+                p.UpdateValue(Psb, prop, o);
+            }
+        }
+
+        internal string GetDigits(object o)
+        {
+            var s = o as string;
+            return s.HasValue() ? s.GetDigits() : null;
+        }
+
+        internal string GetString(object o)
+        {
+            return o?.ToString();
+        }
+
+        internal string GetStringTrimmed(object o)
+        {
+            return GetString(o)?.Trim();
+        }
+
+        internal int? GetInt(object o)
+        {
+            return o.ToInt2();
+        }
+
+        internal decimal GetDecimal(object o)
+        {
+            return o.ToNullableDecimal() ?? 0m;
+        }
+
+        internal DateTime? GetDate(object o)
+        {
+            //DateTime dt = DateTime.FromOADate(39938);
+            var dt = o.ToDate();
+            if (!dt.HasValue)
+            {
+                return dt;
+            }
+
+            if (dt.Value < SqlDateTime.MinValue)
+            {
+                dt = null;
+            }
+
+            return dt;
+        }
+
+        internal int Gender(object o)
+        {
+            var s = o as string;
+            s = s?.Trim()?.ToLower();
+            switch (s)
+            {
+                case "male":
+                case "m":
+                    return 1;
+                case "female":
+                case "f":
+                    return 2;
+            }
+
+            return 0;
+        }
+
+        internal int Marital(object o)
+        {
+            return getMaritalId(o);
+        }
+
+        internal int getMaritalId(object o)
+        {
+            var s = o as string;
+            s = s?.Trim()?.ToLower();
+            int? a = (from m in JobDbContext.MaritalStatuses
+                      where m.Description == s
+                      select m.Id).SingleOrDefault();
+            return a.Value;
+        }
+
+        internal string Title(object o)
+        {
+            var s = o as string;
+            s = s?.Trim()?.ToLower();
+            return !s.HasValue() ? s : s.Truncate(10).TrimEnd();
+        }
+
+        internal int Position(object o)
+        {
+            var s = o as string;
+            s = s?.Trim()?.ToLower();
+            switch (s)
+            {
+                case "primary":
+                    return 10;
+                case "secondary":
+                    return 20;
+                case "child":
+                    return 30;
+            }
+
+            return 10;
+        }
+
+        internal int? Campus(object o)
+        {
+            var s = o as string;
+            if (!s.HasValue())
+            {
+                return null;
+            }
+
+            s = s.Trim().ToLower();
+            int i;
+            if (!Campuses.TryGetValue(s, out i))
+            {
+                return null;
+            }
+
+            return i;
         }
     }
 }

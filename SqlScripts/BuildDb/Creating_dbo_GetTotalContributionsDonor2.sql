@@ -4,7 +4,9 @@ CREATE FUNCTION [dbo].[GetTotalContributionsDonor2]
 	@td DATETIME,
 	@campusid INT,
 	@nontaxded BIT,
-	@includeUnclosed BIT
+	@includeUnclosed BIT,
+	@tagid INT,
+	@fundid INT
 )
 RETURNS TABLE
 AS
@@ -19,7 +21,8 @@ RETURN
 			COUNT(*) AS [Count], 
 			SUM(Amount) AS Amount, 
 			SUM(PledgeAmount) AS PledgeAmount
-		FROM dbo.Contributions2(@fd, @td, @campusid, NULL, @nontaxded, @includeUnclosed)
+		FROM dbo.GetContributionsDetails(@fd, @td, @campusid, NULL, @nontaxded, @includeUnclosed, @tagid, null)
+		WHERE ISNULL(@fundid, 0) = 0 OR FundId = @fundid
 		GROUP BY CreditGiverId, CreditGiverId2, HeadName, SpouseName
 	)
 	SELECT 
@@ -46,6 +49,7 @@ RETURN
 	LEFT JOIN lookup.EnvelopeOption op ON op.Id = p.ContributionOptionsId
 	LEFT OUTER JOIN dbo.Organizations o ON o.OrganizationId = p.BibleFellowshipClassId
 )
+
 GO
 IF @@ERROR <> 0 SET NOEXEC ON
 GO

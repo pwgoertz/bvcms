@@ -574,5 +574,30 @@ namespace CmsData.Finance
         public bool CanGetSettlementDates => true;
 
         public bool CanGetBounces => true;
+        public bool UseIdsForSettlementDates => false;
+        public void CheckBatchSettlements(DateTime start, DateTime end)
+        {
+            CheckBatchedTransactions.CheckBatchSettlements(db, this, start, end);
+        }
+
+        public void CheckBatchSettlements(List<string> transactionids)
+        {
+            throw new NotImplementedException();
+        }
+
+        public string VaultId(int peopleId)
+        {
+            var paymentInfo = db.PaymentInfos.Single(pp => pp.PeopleId == peopleId);
+            switch (Util.PickFirst(paymentInfo.PreferredGivingType, "").ToLower())
+            {
+                case "c":
+                    return paymentInfo.SageCardGuid.ToString();
+                case "b":
+                    return paymentInfo.SageBankGuid.ToString();
+                default:
+                    return (paymentInfo.SageCardGuid ?? paymentInfo.SageBankGuid).ToString();
+            }
+                
+        }
     }
 }

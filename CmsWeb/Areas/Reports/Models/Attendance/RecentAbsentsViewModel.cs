@@ -1,39 +1,41 @@
+using CmsData;
+using Dapper;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
-using CmsData;
-using Dapper;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.Reports.Models
 {
     public class RecentAbsentsViewModel
     {
-        public RecentAbsentsViewModel(int id, int? idfilter)
+        public RecentAbsentsViewModel() { }
+        public RecentAbsentsViewModel(int id, Guid queryid, int? otherorgfilterid)
         {
+            QueryId = queryid;
             OrgId = id;
-            OrgFilterId = idfilter;
+            OtherOrgFilterId = otherorgfilterid;
             DefaultWorshipId = DbUtil.Db.Setting("WorshipId", "0").ToInt();
             var q = from o in DbUtil.Db.Organizations
-                where o.OrganizationId == id
-                let fo = DbUtil.Db.Organizations.Single(oo => oo.OrganizationId == idfilter)
-                let wo = DbUtil.Db.Organizations.Single(oo => oo.OrganizationId == DefaultWorshipId)
-                select new
-                {
-                    o.OrganizationName,
-                    o.LeaderName,
-                    LastMeeting = (from m in DbUtil.Db.Meetings
-                        where m.OrganizationId == id
-                        where m.Attends.Any(aa => aa.AttendanceFlag)
-                        orderby m.MeetingDate descending
-                        select m.MeetingDate).First(),
-                    ConsecutiveAbsentsThreshold = o.ConsecutiveAbsentsThreshold ?? 2,
-                    FilterName = fo != null ? fo.OrganizationName : "",
-                    FilterLeader = fo != null ? fo.LeaderName : "",
-                    WorshipName = wo != null ? wo.OrganizationName : "",
-                };
+                    where o.OrganizationId == OrgId
+                    let fo = DbUtil.Db.Organizations.Single(oo => oo.OrganizationId == otherorgfilterid)
+                    let wo = DbUtil.Db.Organizations.Single(oo => oo.OrganizationId == DefaultWorshipId)
+                    select new
+                    {
+                        o.OrganizationName,
+                        o.LeaderName,
+                        LastMeeting = (from m in DbUtil.Db.Meetings
+                                       where m.OrganizationId == OrgId
+                                       where m.Attends.Any(aa => aa.AttendanceFlag)
+                                       orderby m.MeetingDate descending
+                                       select m.MeetingDate).First(),
+                        ConsecutiveAbsentsThreshold = o.ConsecutiveAbsentsThreshold ?? 2,
+                        FilterName = fo != null ? fo.OrganizationName : "",
+                        FilterLeader = fo != null ? fo.LeaderName : "",
+                        WorshipName = wo != null ? wo.OrganizationName : "",
+                    };
             var i = q.Single();
             OrganizationName = i.OrganizationName;
             OrganizationLeader = i.LeaderName;
@@ -44,11 +46,12 @@ namespace CmsWeb.Areas.Reports.Models
             DefaultWorshipName = i.WorshipName;
         }
         public int OrgId { get; set; }
+        public Guid? QueryId { get; set; }
         public string OrganizationName { get; set; }
         public string OrganizationLeader { get; set; }
         public DateTime? LastMeeting { get; set; }
         public int ConsecutiveAbsentsThreshold { get; set; }
-        public int? OrgFilterId { get; set; }
+        public int? OtherOrgFilterId { get; set; }
         public string OrgFilterName { get; set; }
         public string OrgFilterLeaderName { get; set; }
         public int? DefaultWorshipId { get; set; }
@@ -58,7 +61,7 @@ namespace CmsWeb.Areas.Reports.Models
         {
             var cn = new SqlConnection(Util.ConnectionString);
             cn.Open();
-            return cn.Query("RecentAbsentsSP", new { orgid = OrgId, orgidfilter = OrgFilterId },
+            return cn.Query("RecentAbsents1", new { OrgId, OtherOrgFilterId, QueryId },
                 commandType: CommandType.StoredProcedure, commandTimeout: 600);
         }
     }

@@ -88,7 +88,7 @@ namespace CmsData
 
                 var colrange = ws.Cells[1, col, count + 2, col];
 
-                if (name.Contains("Info") || name.Contains("Classes") || name == "Questions")
+                if (name.Contains("Info") || name.Contains("Classes") || name == "Questions" || name == "Address")
                 {
                     colrange.Style.WrapText = true;
                     ws.Column(col).Width = 40.0;
@@ -126,7 +126,14 @@ namespace CmsData
                     colrange.Style.HorizontalAlignment = ExcelHorizontalAlignment.Right;
                 }
                 else
-                    colrange.AutoFitColumns();
+                    try
+                    {
+                        colrange.AutoFitColumns();
+                    }
+                    catch (Exception)
+                    {
+                        ws.Column(col).Width = 50;
+                    }
             }
             return ws;
         }

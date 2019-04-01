@@ -23,10 +23,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
             {
                 if (_settings == null)
                 {
-                    _settings = HttpContext.Current.Items["RegSettings"] as Dictionary<int, Settings>;
+                    _settings = HttpContextFactory.Current.Items["RegSettings"] as Dictionary<int, Settings>;
                     if (_settings == null)
                         Parent.ParseSettings();
-                    _settings = HttpContext.Current.Items["RegSettings"] as Dictionary<int, Settings>;
+                    _settings = HttpContextFactory.Current.Items["RegSettings"] as Dictionary<int, Settings>;
                 }
                 return _settings;
             }
@@ -147,6 +147,22 @@ namespace CmsWeb.Areas.OnlineReg.Models
                 IsFilled = org.RegLimitCount(DbUtil.Db) >= org.Limit;
             return IsFilled;
         }
+
+        public bool CanRegisterInCommunityGroup(DateTime enrollmentCutoff)
+        {
+            if (PeopleId == null)
+                return false;
+
+            var db = DbUtil.DbReadOnly;
+
+            var results = from om in db.OrganizationMembers
+                join org in db.Organizations on om.OrganizationId equals org.OrganizationId
+                where om.PeopleId == PeopleId && om.EnrollmentDate >= enrollmentCutoff && org.OrganizationType.Code == "CG"
+                select om.PeopleId;
+            
+            return !results.Any();
+        }
+
         public string GetSpecialScript()
         {
             if (org == null) return "Organization not found.";
@@ -259,7 +275,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
                     ? "Sorry, cannot find an appropriate age group for the birthday we have on record for you" 
                     : "Sorry, cannot find an appropriate age group";
             }
-            else if (oo.RegEnd.HasValue && DateTime.Now > oo.RegEnd)
+            else if (oo.RegEnd.HasValue && Util.Now > oo.RegEnd)
                 NoAppropriateOrgError = $"Sorry, registration has ended for {oo.OrganizationName}";
             else if (oo.OrganizationStatusId == OrgStatusCode.Inactive)
                 NoAppropriateOrgError = $"Sorry, {oo.OrganizationName} is inactive";
@@ -453,9 +469,13 @@ namespace CmsWeb.Areas.OnlineReg.Models
             var campusids = (from cid in DbUtil.Db.Setting("CampusIds", "").Split(',')
                              where cid.HasValue()
                              select cid.ToInt()).ToArray();
-            var q = from c in DbUtil.Db.Campus
-                    where campusids.Length == 0  || campusids.Contains(c.Id)
-                    orderby c.Description
+            var qc = from c in DbUtil.Db.Campus
+                where campusids.Length == 0 || campusids.Contains(c.Id)
+                select c;
+            qc = DbUtil.Db.Setting("SortCampusByCode") 
+                ? qc.OrderBy(cc => cc.Code) 
+                : qc.OrderBy(cc => cc.Description);
+            var q = from c in qc
                     select new SelectListItem
                     {
                         Value = c.Id.ToString(),
@@ -478,7 +498,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
             sb.AppendFormat("Org: {0}<br/>\n", org.OrganizationName);
             if (PeopleId.HasValue)
             {
-                sb.Append($"{person.Name}({person.PeopleId},{person.Gender.Code},{person.MaritalStatus.Code}), Birthday: {person.DOB}({person.Age}), Phone: {Phone.FmtFone()}, {person.EmailAddress}, {EmailAddress}<br />\n");
+                sb.Append($"{person.Name}({person.PeopleId},{person.Gender.Code},{person.MaritalStatus.Code}), Birthday: {person.DOB}({Person.AgeDisplay(person.Age, person.PeopleId)}), Phone: {Phone.FmtFone()}, {person.EmailAddress}, {EmailAddress}<br />\n");
                 if (ShowAddress)
                     sb.AppendFormat("&nbsp;&nbsp;{0}; {1}<br />\n", person.PrimaryAddress, person.CityStateZip);
             }
@@ -515,6 +535,14 @@ namespace CmsWeb.Areas.OnlineReg.Models
             return SpecialFundList();
         }
 
+        public SelectListItem[] DesignatedDonationFund()
+        {
+            if (ShouldPullSpecificFund())
+                return ReturnContributionForSetting();
+
+            return new SelectListItem[0];
+        }
+
         private SelectListItem[] ReturnContributionForSetting()
         {
             var fund = DbUtil.Db.ContributionFunds.SingleOrDefault(f => f.FundId == setting.DonationFundId);
@@ -532,9 +560,27 @@ namespace CmsWeb.Areas.OnlineReg.Models
 
         public bool ShouldPullSpecificFund()
         {
-            return Parent.OnlineGiving()
+           return Parent.OnlineGiving()
                    && !Parent.AskDonation()
                    && setting.DonationFundId.HasValue;
+        }
+
+        public static SelectListItem[] EntireFundList()
+        {
+            return (from f in GetAllOnlineFunds()
+                select new SelectListItem
+                {
+                    Text = $"{f.FundName}",
+                    Value = f.FundId.ToString()
+                }).ToArray();
+        }
+
+        public static SelectListItem[] FullFundList(IList<string> defaultFundIds)
+        {
+            var fullList = FullFundList();
+            var list = defaultFundIds.Select(id => fullList.SingleOrDefault(s => s.Value == id)).Where(fund => fund != null).ToList();
+            list.AddRange(fullList.Where(f => !defaultFundIds.Contains(f.Value)));
+            return list.ToArray();
         }
 
         public static SelectListItem[] FullFundList()
@@ -570,6 +616,15 @@ namespace CmsWeb.Areas.OnlineReg.Models
                     }).ToArray();
         }
 
+        public static string GetFundName(int fundId)
+        {
+            var fund =  (from f in GetAllOnlineFunds()
+                where f.FundId == fundId
+                select f).SingleOrDefault();
+
+            return fund?.FundName;
+        }
+
         private static IQueryable<ContributionFund> GetAllOnlineFunds()
         {
             return from f in DbUtil.Db.ContributionFunds
@@ -579,7 +634,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
         }
 
         private PythonModel pythonModel;
-        public PythonModel PythonModel => pythonModel ?? (pythonModel = HttpContext.Current.Items["PythonEvents"] as PythonModel);
+        public PythonModel PythonModel => pythonModel ?? (pythonModel = HttpContextFactory.Current.Items["PythonEvents"] as PythonModel);
 
         private readonly Dictionary<string, string> _nameLookup = new Dictionary<string, string>()
         {
@@ -627,7 +682,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
             if (grouptojoin > 0)
             {
                 OrganizationMember.InsertOrgMembers(DbUtil.Db, grouptojoin, PeopleId.Value, MemberTypeCode.Member,
-                    DateTime.Now, null, false);
+                    Util.Now, null, false);
                 DbUtil.Db.UpdateMainFellowship(grouptojoin);
                 Log("AddedToOrg");
             }
@@ -636,9 +691,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
         {
             if (_setting == null)
                 return;
-            var ndd = setting.AskItems.Count(aa => aa.Type == "AskDropdown");
-            if (ndd > 0 && option == null)
-                option = new string[ndd].ToList();
+            InitializeOptionIfNeeded();
 
             var neqsets = setting.AskItems.Count(aa => aa.Type == "AskExtraQuestions");
             if (neqsets > 0 && ExtraQuestion == null)
@@ -669,6 +722,16 @@ namespace CmsWeb.Areas.OnlineReg.Models
             if (!Suggestedfee.HasValue && setting.AskVisible("AskSuggestedFee"))
                 Suggestedfee = setting.Fee;
         }
+
+        private void InitializeOptionIfNeeded()
+        {
+            if (option != null)
+                return;
+            var ndd = setting.AskItems.Count(aa => aa.Type == "AskDropdown");
+            if (ndd > 0)
+                option = new string[ndd].ToList();
+        }
+
         public void Log(string action)
         {
             DbUtil.LogActivity("OnlineReg " + action, masterorgid ?? orgid, PeopleId ?? Parent.UserPeopleId, Parent.DatumId);

@@ -1,10 +1,9 @@
+using CmsData;
+using CmsWeb.Code;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using System.Web;
 using System.Web.Mvc;
-using CmsData;
-using CmsWeb.Code;
 
 namespace CmsWeb.Areas.Org.Models
 {
@@ -18,18 +17,31 @@ namespace CmsWeb.Areas.Org.Models
             set
             {
                 if (Org == null)
+                {
                     Org = DbUtil.Db.LoadOrganizationById(value);
+                }
             }
         }
-        public void Update()
+        public void Update(bool userIsAdmin)
         {
-            if(LimitToRole == null)
+            if (LimitToRole == null)
+            {
                 LimitToRole = new CodeInfo("0", new SelectList(Roles(), "Value", "Text"));
+            }
             if (LimitToRole.Value == "0")
+            {
                 LimitToRole.Value = null;
+            }
             if (Gender.Value == "99")
+            {
                 Gender.Value = null;
-            this.CopyPropertiesTo(Org);
+            }
+            string exclusions = null;
+            if (!userIsAdmin)
+            {
+                exclusions = "LimitToRole";
+            }
+            this.CopyPropertiesTo(Org, excludefields: exclusions);
             DbUtil.Db.SubmitChanges();
         }
 
@@ -55,7 +67,7 @@ namespace CmsWeb.Areas.Org.Models
             }).ToList();
 
             var seldefault = !list.Any(vv => vv.Selected);
-            list.Insert(0, new SelectListItem { Value = "0", Text = "(not specified)", Selected = seldefault});
+            list.Insert(0, new SelectListItem { Value = "0", Text = "(not specified)", Selected = seldefault });
             return list;
         }
 
@@ -89,6 +101,15 @@ namespace CmsWeb.Areas.Org.Models
         [Display(Description = IsMissionTripDescription)]
         public bool IsMissionTrip { get; set; }
 
+        [Display(Name = "Enable Funding Pages", Description = TripFundingPagesEnableDescription)]
+        public bool TripFundingPagesEnable { get; set; }
+
+        [Display(Name = "Enable Public Funding Pages", Description = TripFundingPagesPublicDescription)]
+        public bool TripFundingPagesPublic { get; set; }
+
+        [Display(Name = "Show Public Funding Amounts", Description = TripFundingPagesShowAmountsDescription)]
+        public bool TripFundingPagesShowAmounts { get; set; }
+
         [Display(Description = NoCreditCardsDescription)]
         public bool NoCreditCards { get; set; }
 
@@ -117,7 +138,7 @@ Used during promotion to assign a grade to a student who joins this class.
 Keeps you from having to maintain grades once a year.
 
 **This field only works when the Org is a Main Fellowship type of organization.**
-See *<a href=""http://docs.touchpointsoftware.com/Organizations/GeneralSettings.html"" target=""_blank"">this help article</a>*.
+See *<a href=""https://docs.touchpointsoftware.com/Organizations/GeneralSettings.html"" target=""_blank"">this help article</a>*.
 
 Must be an integer number, not a range,
 **Do Not Use** something like 7-10.
@@ -144,6 +165,15 @@ This enables special handling for team handling and creation.
 ";
         private const string IsMissionTripDescription = @"
 Allows others to donate on behalf of a mission trip participant.
+";
+        private const string TripFundingPagesEnableDescription = @"
+Allows participants to view how much they still owe, a list of people who donated and their gifts on a single page.
+";
+        private const string TripFundingPagesPublicDescription = @"
+Used for fundraising. Each participants funding page will be public for anyone who has the link. This also changes the donation emails to include the funding page link.
+";
+        private const string TripFundingPagesShowAmountsDescription = @"
+Allows others to view how much each giver donated on the funding page for a participant.
 ";
         private const string NoCreditCardsDescription = @"
 Disallow Credit Cards on this org.

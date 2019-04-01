@@ -56,15 +56,19 @@ namespace CmsData
 		
 		private string _CClist;
 		
+		private bool? _Testing;
+		
+		private bool? _ReadyToSend;
+		
    		
-   		private EntitySet< EmailLink> _EmailLinks;
+   		private EntitySet<EmailLink> _EmailLinks;
 		
-   		private EntitySet< EmailQueueTo> _EmailQueueTos;
+   		private EntitySet<EmailQueueTo> _EmailQueueTos;
 		
-   		private EntitySet< EmailResponse> _EmailResponses;
+   		private EntitySet<EmailResponse> _EmailResponses;
 		
     	
-		private EntityRef< Person> _Person;
+		private EntityRef<Person> _Person;
 		
 	#endregion
 	
@@ -130,18 +134,24 @@ namespace CmsData
 		partial void OnCClistChanging(string value);
 		partial void OnCClistChanged();
 		
+		partial void OnTestingChanging(bool? value);
+		partial void OnTestingChanged();
+		
+		partial void OnReadyToSendChanging(bool? value);
+		partial void OnReadyToSendChanged();
+		
     #endregion
 		public EmailQueue()
 		{
 			
-			this._EmailLinks = new EntitySet< EmailLink>(new Action< EmailLink>(this.attach_EmailLinks), new Action< EmailLink>(this.detach_EmailLinks)); 
+			this._EmailLinks = new EntitySet<EmailLink>(new Action< EmailLink>(this.attach_EmailLinks), new Action< EmailLink>(this.detach_EmailLinks)); 
 			
-			this._EmailQueueTos = new EntitySet< EmailQueueTo>(new Action< EmailQueueTo>(this.attach_EmailQueueTos), new Action< EmailQueueTo>(this.detach_EmailQueueTos)); 
+			this._EmailQueueTos = new EntitySet<EmailQueueTo>(new Action< EmailQueueTo>(this.attach_EmailQueueTos), new Action< EmailQueueTo>(this.detach_EmailQueueTos)); 
 			
-			this._EmailResponses = new EntitySet< EmailResponse>(new Action< EmailResponse>(this.attach_EmailResponses), new Action< EmailResponse>(this.detach_EmailResponses)); 
+			this._EmailResponses = new EntitySet<EmailResponse>(new Action< EmailResponse>(this.attach_EmailResponses), new Action< EmailResponse>(this.detach_EmailResponses)); 
 			
 			
-			this._Person = default(EntityRef< Person>); 
+			this._Person = default(EntityRef<Person>); 
 			
 			OnCreated();
 		}
@@ -571,12 +581,56 @@ namespace CmsData
 		}
 
 		
+		[Column(Name="Testing", UpdateCheck=UpdateCheck.Never, Storage="_Testing", DbType="bit")]
+		public bool? Testing
+		{
+			get { return this._Testing; }
+
+			set
+			{
+				if (this._Testing != value)
+				{
+				
+                    this.OnTestingChanging(value);
+					this.SendPropertyChanging();
+					this._Testing = value;
+					this.SendPropertyChanged("Testing");
+					this.OnTestingChanged();
+				}
+
+			}
+
+		}
+
+		
+		[Column(Name="ReadyToSend", UpdateCheck=UpdateCheck.Never, Storage="_ReadyToSend", DbType="bit")]
+		public bool? ReadyToSend
+		{
+			get { return this._ReadyToSend; }
+
+			set
+			{
+				if (this._ReadyToSend != value)
+				{
+				
+                    this.OnReadyToSendChanging(value);
+					this.SendPropertyChanging();
+					this._ReadyToSend = value;
+					this.SendPropertyChanged("ReadyToSend");
+					this.OnReadyToSendChanged();
+				}
+
+			}
+
+		}
+
+		
     #endregion
         
     #region Foreign Key Tables
    		
    		[Association(Name="FK_EmailLinks_EmailQueue", Storage="_EmailLinks", OtherKey="EmailID")]
-   		public EntitySet< EmailLink> EmailLinks
+   		public EntitySet<EmailLink> EmailLinks
    		{
    		    get { return this._EmailLinks; }
 
@@ -586,7 +640,7 @@ namespace CmsData
 
 		
    		[Association(Name="FK_EmailQueueTo_EmailQueue", Storage="_EmailQueueTos", OtherKey="Id")]
-   		public EntitySet< EmailQueueTo> EmailQueueTos
+   		public EntitySet<EmailQueueTo> EmailQueueTos
    		{
    		    get { return this._EmailQueueTos; }
 
@@ -596,7 +650,7 @@ namespace CmsData
 
 		
    		[Association(Name="FK_EmailResponses_EmailQueue", Storage="_EmailResponses", OtherKey="EmailQueueId")]
-   		public EntitySet< EmailResponse> EmailResponses
+   		public EntitySet<EmailResponse> EmailResponses
    		{
    		    get { return this._EmailResponses; }
 

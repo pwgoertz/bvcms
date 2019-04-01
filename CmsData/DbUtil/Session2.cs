@@ -14,32 +14,14 @@ namespace CmsData
 {
     public partial class CMSDataContext
     {
-        private CurrentOrg currentOrg;
-        public CurrentOrg CurrentOrg
-        {
-            get { return currentOrg ?? (currentOrg = Util2.CurrentOrganization); }
-            set
-            {
-                Util2.CurrentOrganization = value;
-                currentOrg = value;
-            }
-        }
-
         public void SetCurrentOrgId(int? id)
         {
-            if(CurrentOrg == null)
-                CurrentOrg = new CurrentOrg() { GroupSelect = Codes.GroupSelectCode.Member };
-            CurrentOrgId = id;
-            CurrentOrg.Id = id;
+            Util2.CurrentOrgId = id;
+//            CurrentOrgId = id;
         }
+//        public int? CurrentOrgId { get; set; }
+        public int CurrentSessionOrgId => Util2.CurrentOrgId ?? 0;
 
-        public int? CurrentOrgId { get; set; }
-
-        public int CurrentOrgId0 => (CurrentOrg ?? new CurrentOrg()).Id ?? Util2.CurrentOrgId ?? 0;
-
-        public int[] CurrentGroups { get; set; }
-        public string CurrentGroupsPrefix { get; set; }
-        public int CurrentGroupsMode { get; set; }
         public int CurrentPeopleId { get; set; }
         public string CurrentTagName { get; set; }
         public int? CurrentTagOwnerId { get; set; }
@@ -54,16 +36,22 @@ namespace CmsData
         {
             get
             {
-                if (Util.IsDebug())
-                    return ConfigurationManager.AppSettings["cmshost"];
+                string defaultHost = null;
+                if (Util.IsDebug()) 
+                {
+                    defaultHost = ConfigurationManager.AppSettings["cmshost"];
+                }
 
                 // choose DefaultHost setting first
-                var defaultHost = Setting("DefaultHost", "");
+                if (!defaultHost.HasValue())
+                {
+                    defaultHost = Setting("DefaultHost", "");
+                }
 
                 // if no DefaultHost setting exists, use current URL
-                if (!defaultHost.HasValue() && HttpContext.Current != null)
+                if (!defaultHost.HasValue() && HttpContextFactory.Current != null)
                 {
-                    var request = HttpContext.Current.Request;
+                    var request = HttpContextFactory.Current.Request;
                     defaultHost = Util.URLCombine(Scheme() + "://" + request.Url.Authority, "");
                 }
 
@@ -71,7 +59,7 @@ namespace CmsData
                 if (!defaultHost.HasValue())
                     defaultHost = Util.URLCombine(ConfigurationManager.AppSettings["cmshost"], "");
 
-                if (defaultHost.HasValue())
+                if (Host.HasValue())
                     return defaultHost.Replace("{church}", Host, ignoreCase: true);
 
                 throw (new Exception("No URL for Server in CmsHost"));
@@ -80,9 +68,9 @@ namespace CmsData
 
         private string Scheme()
         {
-            if (HttpContext.Current != null)
+            if (HttpContextFactory.Current != null)
             {
-                var Request = HttpContext.Current.Request;
+                var Request = HttpContextFactory.Current.Request;
                 var scheme = Request.Url.Scheme;
                 if (Request.Headers["X-Forwarded-Proto"] == "https")
                     scheme = "https";
@@ -97,11 +85,8 @@ namespace CmsData
 
         public void CopySession()
         {
-            if (HttpContext.Current != null && HttpContext.Current.Session != null)
+            if (HttpContextFactory.Current != null && HttpContextFactory.Current.Session != null)
             {
-                if (CurrentOrg == null)
-                    CurrentOrg = new CurrentOrg() {Id = Util2.CurrentOrgId};
-                CurrentOrgId = CurrentOrg.Id;
                 CurrentPeopleId = Util2.CurrentPeopleId;
                 CurrentTagOwnerId = Util2.CurrentTagOwnerId;
                 CurrentTagName = Util2.CurrentTagName;
@@ -119,12 +104,14 @@ namespace CmsData
         }
         public string Setting(string name, string defaultvalue)
         {
+            if (name == null)
+                return defaultvalue;
             var list = HttpRuntime.Cache[Host + "Setting"] as Dictionary<string, string>;
             if (list == null)
             {
                 try
                 {
-                    list = Settings.ToDictionary(c => c.Id.Trim(), c => c.SettingX,
+                    list = Settings.ToList().ToDictionary(c => c.Id.Trim(), c => c.SettingX,
                         StringComparer.OrdinalIgnoreCase);
                     HttpRuntime.Cache.Insert(Host + "Setting", list, null,
                         DateTime.Now.AddSeconds(15), Cache.NoSlidingExpiration);

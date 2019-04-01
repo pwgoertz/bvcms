@@ -10,11 +10,18 @@ namespace CmsWeb.Areas.People.Controllers
         [HttpGet]
         public JsonResult Campuses()
         {
-            var q = from c in DbUtil.Db.Campus
-                    select new { value = c.Id, text = c.Description };
-            var list = q.ToList();
+            var qc = CurrentDatabase.Campus.AsQueryable();
+            qc = CurrentDatabase.Setting("SortCampusByCode")
+                ? qc.OrderBy(cc => cc.Code)
+                : qc.OrderBy(cc => cc.Description);
+            var list = (from c in qc
+                        select new
+                        {
+                            value = c.Id,
+                            text = c.Description,
+                        }).ToList();
             list.Insert(0, new { value = 0, text = "(not specified)" });
-            if (DbUtil.Db.Setting("CampusRequired")
+            if (CurrentDatabase.Setting("CampusRequired")
                 && Util.UserPeopleId == Util2.CurrentPeopleId
                 && !User.IsInRole("Admin"))
                 list.RemoveAt(0);
@@ -24,7 +31,7 @@ namespace CmsWeb.Areas.People.Controllers
         public JsonResult FamilyPositions()
         {
             Response.SetCacheMinutes(5);
-            var q = from c in DbUtil.Db.FamilyPositions
+            var q = from c in CurrentDatabase.FamilyPositions
                     select new { value = c.Id, text = c.Description };
             var list = q.ToList();
             return Json(list.ToArray(), JsonRequestBehavior.AllowGet);
@@ -32,7 +39,7 @@ namespace CmsWeb.Areas.People.Controllers
         [HttpPost]
         public JsonResult Schools(string query)
         {
-            var qu = from p in DbUtil.Db.People
+            var qu = from p in CurrentDatabase.People
                      where p.SchoolOther.Contains(query)
                      group p by p.SchoolOther into g
                      select g.Key;
@@ -41,7 +48,7 @@ namespace CmsWeb.Areas.People.Controllers
         [HttpPost]
         public JsonResult Employers(string query)
         {
-            var qu = from p in DbUtil.Db.People
+            var qu = from p in CurrentDatabase.People
                      where p.EmployerOther.Contains(query)
                      group p by p.EmployerOther into g
                      select g.Key;
@@ -50,7 +57,7 @@ namespace CmsWeb.Areas.People.Controllers
         [HttpPost]
         public JsonResult Occupations(string query)
         {
-            var qu = from p in DbUtil.Db.People
+            var qu = from p in CurrentDatabase.People
                      where p.OccupationOther.Contains(query)
                      group p by p.OccupationOther into g
                      select g.Key;
@@ -59,7 +66,7 @@ namespace CmsWeb.Areas.People.Controllers
         [HttpPost]
         public JsonResult Churches(string query)
         {
-            var qu = from r in DbUtil.Db.ViewChurches
+            var qu = from r in CurrentDatabase.ViewChurches
                      where r.C.Contains(query)
                      select r.C;
             return Json(qu.Take(10).ToArray(), JsonRequestBehavior.AllowGet);

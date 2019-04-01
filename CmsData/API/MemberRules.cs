@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Text;
 using UtilityExtensions;
@@ -10,6 +11,8 @@ using IronPython.Hosting;
 using System.IO;
 using CmsData.Codes;
 using System.Web;
+using IronPython.Runtime;
+using Microsoft.Scripting.Hosting.Providers;
 
 namespace CmsData
 {
@@ -39,7 +42,7 @@ namespace CmsData
             var script = Db.Content("MemberProfileAutomation");
             if (script == null)
                 return "ok";
-            var path = HttpContext.Current.Server.MapPath("/Content/");
+            var path = HttpContextFactory.Current.Server.MapPath("/Content/");
 #if DEBUG2
             var options = new Dictionary<string, object>();
             options["Debug"] = true;
@@ -47,12 +50,15 @@ namespace CmsData
             var paths = engine.GetSearchPaths();
             paths.Add(path);
             engine.SetSearchPaths(paths);
-            var sc = engine.CreateScriptSourceFromFile(HttpContext.Current.Server.MapPath("/Content/MembershipAutomation2.py"));
+            var sc = engine.CreateScriptSourceFromFile(HttpContextFactory.Current.Server.MapPath("/Content/MembershipAutomation2.py"));
 #else
             var engine = Python.CreateEngine();
-            var paths = engine.GetSearchPaths();
-            paths.Add(path);
-            engine.SetSearchPaths(paths);
+            var pc = HostingHelpers.GetLanguageContext(engine) as PythonContext;
+            var hooks = pc?.SystemState.Get__dict__()["path_hooks"] as List;
+            hooks?.Clear();
+            var searchPaths = engine.GetSearchPaths();
+            searchPaths.Add(ConfigurationManager.AppSettings["PythonLibPath"]);
+            engine.SetSearchPaths(searchPaths);
             var sc = engine.CreateScriptSourceFromString(script.Body);
 #endif
 

@@ -40,9 +40,11 @@ namespace CmsData
 		
 		private string _Type;
 		
+		private string _Metadata;
+		
    		
     	
-		private EntityRef< Organization> _Organization;
+		private EntityRef<Organization> _Organization;
 		
 	#endregion
 	
@@ -84,12 +86,15 @@ namespace CmsData
 		partial void OnTypeChanging(string value);
 		partial void OnTypeChanged();
 		
+		partial void OnMetadataChanging(string value);
+		partial void OnMetadataChanged();
+		
     #endregion
 		public OrganizationExtra()
 		{
 			
 			
-			this._Organization = default(EntityRef< Organization>); 
+			this._Organization = default(EntityRef<Organization>); 
 			
 			OnCreated();
 		}
@@ -336,6 +341,28 @@ namespace CmsData
 					this._Type = value;
 					this.SendPropertyChanged("Type");
 					this.OnTypeChanged();
+				}
+
+			}
+
+		}
+
+		
+		[Column(Name="Metadata", UpdateCheck=UpdateCheck.Never, Storage="_Metadata", DbType="nvarchar")]
+		public string Metadata
+		{
+			get { return this._Metadata; }
+
+			set
+			{
+				if (this._Metadata != value)
+				{
+				
+                    this.OnMetadataChanging(value);
+					this.SendPropertyChanging();
+					this._Metadata = value;
+					this.SendPropertyChanged("Metadata");
+					this.OnMetadataChanged();
 				}
 
 			}

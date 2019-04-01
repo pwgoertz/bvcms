@@ -26,6 +26,7 @@ For each checkbox, you can specify the following:
 * **DateTime** (optional) which registers them in a meeting.
 ";
 
+        public bool TargetExtraValue { get; set; }
         public string Label { get; set; }
         public bool HasLabel => Label.HasValue();
         public int? Minimum { get; set; }
@@ -42,9 +43,10 @@ For each checkbox, you can specify the following:
         {
             var cb = new AskCheckboxes
             {
-                Minimum = ele.Attribute("Minimum")?.Value.ToInt2(),
-                Maximum = ele.Attribute("Maximum")?.Value.ToInt2(),
-                Columns = ele.Attribute("Columns")?.Value.ToInt2(),
+                TargetExtraValue = ele.Attribute("TargetExtraValue").ToBool(),
+                Minimum = ele.Attribute("Minimum").ToInt2(),
+                Maximum = ele.Attribute("Maximum").ToInt2(),
+                Columns = ele.Attribute("Columns").ToInt2(),
                 Label = ele.Element("Label")?.Value,
             };
             foreach (var ee in ele.Elements("CheckboxItem"))
@@ -58,6 +60,7 @@ For each checkbox, you can specify the following:
             if (list.Count == 0)
                 return;
             w.Start(Type)
+                .AttrIfTrue("TargetExtraValue", TargetExtraValue)
                 .Attr("Minimum", Minimum)
                 .Attr("Maximum", Maximum)
                 .Attr("Columns", Columns == 1 ? null : Columns)
@@ -79,6 +82,8 @@ For each checkbox, you can specify the following:
         {
             try
             {
+                if(items == null)
+                    return new List<CheckboxItem>();
                 var q = from i in items
                         join c in list on i equals c.SmallGroup
                         select c;
@@ -129,9 +134,9 @@ For each checkbox, you can specify the following:
                 var i = new CheckboxItem
                 {
                     Description = ele.Element("Description")?.Value,
-                    Fee = ele.Attribute("Fee")?.Value.ToDecimal(),
-                    Limit = ele.Attribute("Limit")?.Value.ToInt2(),
-                    MeetingTime = ele.Attribute("Time")?.Value.ToDate()
+                    Fee = ele.Attribute("Fee").ToDecimal(),
+                    Limit = ele.Attribute("Limit").ToInt2(),
+                    MeetingTime = ele.Attribute("Time").ToDate()
                 };
                 i.SmallGroup = (ele.Element("SmallGroup")?.Value ?? i.Description)?.TrimEnd();
                 return i;
@@ -143,7 +148,7 @@ For each checkbox, you can specify the following:
                     .Attr("Limit", Limit)
                     .Attr("Time", MeetingTime.ToString2("s"))
                     .Add("Description", Description)
-                    .Add("SmallGroup", SmallGroup.trim())
+                    .Add("SmallGroup", SmallGroup?.Trim())
                     .End();
             }
             public void AddToSmallGroup(CMSDataContext Db, OrganizationMember om, PythonModel pe)
@@ -152,21 +157,21 @@ For each checkbox, you can specify the following:
                     return;
                 if (pe != null)
                 {
-                    pe.instance.AddToSmallGroup(SmallGroup.trim(), om);
+                    pe.instance.AddToSmallGroup(SmallGroup?.Trim(), om);
                     om.Person.LogChanges(Db, om.PeopleId);
                 }
-                om.AddToGroup(Db, SmallGroup.trim());
+                om.AddToGroup(Db, SmallGroup?.Trim());
                 if (MeetingTime.HasValue)
                     Attend.MarkRegistered(Db, om.OrganizationId, om.PeopleId, MeetingTime.Value, 1);
             }
             public void RemoveFromSmallGroup(CMSDataContext Db, OrganizationMember om)
             {
-                om.RemoveFromGroup(Db, SmallGroup.trim());
+                om.RemoveFromGroup(Db, SmallGroup?.Trim());
             }
             public bool IsSmallGroupFilled(IEnumerable<string> smallgroups)
             {
                 if (!(Limit > 0)) return false;
-                var cnt = smallgroups.Count(mm => mm.trim() == SmallGroup.trim());
+                var cnt = smallgroups.Count(mm => mm.HasValue() && mm.Trim().Equal(SmallGroup?.Trim()));
                 return cnt >= Limit;
             }
         }

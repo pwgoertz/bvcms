@@ -1,8 +1,11 @@
+using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Web;
 using System.Xml.Linq;
 
 namespace UtilityExtensions
@@ -13,10 +16,10 @@ namespace UtilityExtensions
         public static string[] SplitUpperCase(this string source)
         {
             if (source == null)
-                return new string[] {}; //Return empty array.
+                return new string[] { }; //Return empty array.
 
             if (source.Length == 0)
-                return new[] {""};
+                return new[] { "" };
 
             var words = new StringCollection();
             var wordStartIndex = 0;
@@ -52,6 +55,13 @@ namespace UtilityExtensions
             var re = new Regex(@"\B\p{Lu}\p{Ll}", RegexOptions.Compiled);
             name = re.Replace(name, " $0");
             return name;
+        }
+
+        public static string JoinInts(this IEnumerable<int> ints, string sep)
+        {
+            if (ints == null)
+                return null;
+            return string.Join(sep, ints);
         }
 
         public static string Replace(this string str, string oldValue, string newValue, bool ignoreCase = false)
@@ -105,7 +115,7 @@ namespace UtilityExtensions
             var option = noblanks
                 ? StringSplitOptions.RemoveEmptyEntries
                 : StringSplitOptions.None;
-            return source.Split(new[] {"\r\n", "\n", "\r"}, option);
+            return source.Split(new[] { "\r\n", "\n", "\r" }, option);
         }
 
         public static string GetAttr(this XElement e, string n, string def = null)
@@ -118,13 +128,6 @@ namespace UtilityExtensions
         {
             if (source.HasValue() && source.Length > length)
                 source = source.Substring(0, length).Trim();
-            return source;
-        }
-
-        // ReSharper disable once InconsistentNaming
-        public static string trim(this string source)
-        {
-            source = source?.Trim();
             return source;
         }
 
@@ -180,7 +183,7 @@ namespace UtilityExtensions
         public static string MaxString(this string s, int length)
         {
             if (s?.Length > length)
-                s = s.Substring(0, length);
+                return s.Substring(0, length);
             return s;
         }
 
@@ -196,7 +199,7 @@ namespace UtilityExtensions
 
             for (var i = 0; i < password.Length; i++)
             {
-                var r = i%4;
+                var r = i % 4;
                 if (r == 1 || r == 2)
                     password[i] = pdigits[random.Next(pdigits.Length - 1)];
                 else
@@ -293,15 +296,67 @@ namespace UtilityExtensions
             sb.Append(" " + s);
         }
 
-        public static string GetCsvToken(this string s, int n = 1, int ntokens=1000, string sep = ",")
+        public static string GetCsvToken(this string s, int n = 1, int ntokens = 1000, string sep = ",")
         {
             var a = s.SplitStr(sep, ntokens);
-            return a.Length >= n ? a[n-1] : "";
+            return a.Length >= n ? a[n - 1] : "";
         }
         public static string RemoveGrammarly(this string s)
         {
             s = Regex.Replace(s, "<style type=\"text/css\">._44eb54-hoverMenu.*?</style>", "", RegexOptions.Singleline);
             return Regex.Replace(s, @"\sdata-gramm\w*?="".*?""", "", RegexOptions.Singleline);
+        }
+
+        public static string Md5Hash(this string s)
+        {
+            using (var md5 = MD5.Create())
+            {
+                var bytes = Encoding.ASCII.GetBytes(s);
+                var hash = md5.ComputeHash(bytes);
+                var sb = new StringBuilder();
+                foreach (var t in hash)
+                    sb.Append(t.ToString("x2"));
+                return sb.ToString();
+            }
+        }
+        public static string Sha256Hash(this string s)
+        {
+            using (var sha = SHA256.Create())
+            {
+                var bytes = Encoding.UTF8.GetBytes(s);
+                var hash = sha.ComputeHash(bytes);
+                var sb = new StringBuilder();
+                foreach (var t in hash)
+                    sb.Append(t.ToString("x2"));
+                return sb.ToString();
+            }
+        }
+
+        public static string SlugifyString(this string original)
+        {
+            if (original == null)
+                return string.Empty;
+
+            // Replace all non-alphanumeric
+            var rgx = new Regex("[^a-zA-Z0-9]");
+            var slug = rgx.Replace(original, "");
+            var lowercaseSlug = slug.ToLower();
+
+            return lowercaseSlug;
+        }
+
+        public static string HtmlEncode(this string s)
+        {
+            return HttpUtility.HtmlEncode(s);
+        }
+
+        public static Dictionary<string, object> ToDictionary(this string value)
+        {
+            if (value == null)
+            {
+                return new Dictionary<string, object>();
+            }
+            return JsonConvert.DeserializeObject<Dictionary<string, object>>(value);
         }
     }
 }

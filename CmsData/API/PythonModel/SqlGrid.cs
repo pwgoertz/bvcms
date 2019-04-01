@@ -1,14 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
 using System.Data.SqlClient;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using Dapper;
 using UtilityExtensions;
 using System.Web.UI;
 using System.Web.UI.WebControls;
+using Microsoft.Scripting.Utils;
 
 namespace CmsData
 {
@@ -17,6 +20,7 @@ namespace CmsData
         public string SqlGrid(string sql)
         {
             var p = new DynamicParameters();
+            int? tagid = null;
 
             if (sql.Contains("@BlueToolbarTagId"))
                 if (dictionary.ContainsKey("BlueToolbarGuid"))
@@ -24,8 +28,9 @@ namespace CmsData
                     var guid = (dictionary["BlueToolbarGuid"] as string).ToGuid();
                     if (!guid.HasValue)
                         throw new Exception("missing BlueToolbar Information");
-                    var j = DbUtil.Db.PeopleQuery(guid.Value).Select(vv => vv.PeopleId).Take(1000);
-                    var tag = DbUtil.Db.PopulateTemporaryTag(j);
+                    var j = db.PeopleQuery(guid.Value).Select(vv => vv.PeopleId).Take(1000);
+                    var tag = db.PopulateTemporaryTag(j);
+                    tagid = tag.Id;
                     p.Add("@BlueToolbarTagId", tag.Id);
                 }
             var cs = db.CurrentUser.InRole("Finance")
@@ -38,6 +43,7 @@ namespace CmsData
                 {
                     var table = Table(rd);
                     return $@"
+<!-- TagId={tagid} -->
 <div class=""report box box-responsive"">
   <div class=""box-content"">
     <div class=""table-responsive"">
@@ -48,6 +54,43 @@ namespace CmsData
 </div>
 ";
                 }
+            }
+        }
+
+        public static string PageBreakTables(CMSDataContext db, string sql, DynamicParameters p)
+        {
+            var cs = db.CurrentUser.InRole("Finance")
+                ? Util.ConnectionStringReadOnlyFinance
+                : Util.ConnectionStringReadOnly;
+            var cn = new SqlConnection(cs);
+            cn.Open();
+            var sb = new StringBuilder();
+            int pagebreakcol = 0;
+            var pg = 1;
+            while (true)
+            {
+                var s = sql.Replace("WHERE 1=1", $"WHERE pagebreak={pg}");
+                var cmd = new SqlCommand(s, cn);
+                foreach (var parm in p.ParameterNames)
+                {
+                    var value = p.Get<dynamic>(parm);
+                    cmd.Parameters.AddWithValue(parm, value);
+                }
+                cmd.CommandTimeout = 1200;
+                using (var rd = cmd.ExecuteReader())
+                {
+                    if (!rd.HasRows)
+                        return sb.ToString();
+                    if (pg == 1)
+                    {
+                        var colnames = Enumerable.Range(0, rd.FieldCount).Select(rd.GetName).ToList();
+                        pagebreakcol = colnames.FindIndex(vv => vv == "pagebreak");
+                    }
+                    var t = HtmlTable(rd, $"pagebreak={pagebreakcol}");
+                    t.RenderControl(new HtmlTextWriter(new StringWriter(sb)));
+                    sb.AppendLine("<div class='page-break'></div>");
+                }
+                pg++;
             }
         }
 
@@ -73,6 +116,8 @@ namespace CmsData
             {
                 var typ = rd.GetDataTypeName(i);
                 var nam = rd.GetName(i).ToLower();
+                if (nam == "pagebreak")
+                    break;
                 var align = HorizontalAlign.NotSet;
                 switch (typ.ToLower())
                 {
@@ -84,7 +129,7 @@ namespace CmsData
                             align = HorizontalAlign.Right;
                         break;
                 }
-                if(!nam.Equal("linkfornext"))
+                if (!nam.Equal("linkfornext"))
                     h.Cells.Add(new TableHeaderCell
                     {
                         Text = rd.GetName(i),
@@ -92,16 +137,25 @@ namespace CmsData
                     });
             }
             t.Rows.Add(h);
+            int? pbcol = null;
             var rn = 0;
             string linkfornext = null;
             while (rd.Read())
             {
+                if (!pbcol.HasValue && title?.StartsWith("pagebreak=") == true)
+                {
+                    var match = Regex.Match(title, @"pagebreak=(\d*)");
+                    pbcol = match.Groups[1].Value.ToInt();
+                    t.Rows[0].Cells[0].Text = rd.GetString(pbcol.Value + 1);
+                }
                 rn++;
                 if (maxrows.HasValue && rn > maxrows)
                     break;
                 var r = new TableRow();
                 for (var i = 0; i < rd.FieldCount; i++)
                 {
+                    if (i == pbcol)
+                        break;
                     var typ = rd.GetDataTypeName(i);
                     var nam = rd.GetName(i).ToLower();
                     if (nam == "linkfornext")
@@ -155,8 +209,13 @@ namespace CmsData
                             break;
                         default:
                             s = rd[i].ToString();
-                            if (s == "Total")
+                            if (s == "Total" || s.StartsWith("Total:") || s == "Grand Total")
                                 s = $"<strong>{s}</strong>";
+                            if (nam.StartsWith("att") && nam.EndsWith("str"))
+                            {
+                                s = $"<span style='font-family: monospace'>{s}</span>";
+                                align = HorizontalAlign.Right;
+                            }
                             break;
                     }
                     if (linkfornext.HasValue())

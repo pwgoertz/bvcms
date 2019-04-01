@@ -18,16 +18,15 @@
     @foreach (var q in Model.List)
     {
       Model.GetLinks(q);
-      var link = DbUtil.Db.ServerLink($"/Query/{Model.Existing}");
+      var link = Model.ServerLink("/Query/" + Model.Existing);
       <h3>
         <a href="@link" target="query">@q.owner &mdash; @q.name</a> @(q.ispublic ? "public" : "private")
       </h3>
-      <div style="color: red">Counts: Original=@q.OriginalCount  Parsed=@q.ParsedCount  Seconds=@q.Seconds</div>
       <pre>
 @Model.Code
 </pre>
       <pre>
-@q.Message
+@Model.Sql
 </pre>
     }
 

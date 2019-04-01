@@ -1,12 +1,11 @@
+using CmsData;
+using CmsData.View;
+using MoreLinq;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Web;
-using CmsData;
-using CmsData.Finance;
-using CmsData.View;
-using MoreLinq;
 using UtilityExtensions;
 
 namespace CmsWeb.Models
@@ -22,7 +21,9 @@ namespace CmsWeb.Models
         {
             name = tranid.ToString();
             if (!tranid.HasValue)
+            {
                 GoerId = null;
+            }
 
             if (!string.IsNullOrWhiteSpace(reference))
             {
@@ -39,8 +40,8 @@ namespace CmsWeb.Models
             Pager = new PagerModel2(Count);
             Pager.Sort = "Date";
             Pager.Direction = "desc";
-            finance = HttpContext.Current.User.IsInRole("Finance");
-            admin = HttpContext.Current.User.IsInRole("Admin") || HttpContext.Current.User.IsInRole("ManageTransactions");
+            finance = HttpContextFactory.Current.User.IsInRole("Finance");
+            admin = HttpContextFactory.Current.User.IsInRole("Admin") || HttpContextFactory.Current.User.IsInRole("ManageTransactions");
         }
 
         public string description { get; set; }
@@ -52,6 +53,7 @@ namespace CmsWeb.Models
         public DateTime? enddt { get; set; }
         public bool testtransactions { get; set; }
         public bool apprtransactions { get; set; }
+        public bool includesadditionaldonation { get; set; }
         public bool nocoupons { get; set; }
         public string batchref { get; set; }
         public bool usebatchdates { get; set; }
@@ -64,7 +66,10 @@ namespace CmsWeb.Models
         public int Count()
         {
             if (!_count.HasValue)
+            {
                 _count = FetchTransactions().Count();
+            }
+
             return _count.Value;
         }
 
@@ -94,16 +99,25 @@ namespace CmsWeb.Models
         private IQueryable<TransactionList> FetchTransactions()
         {
             if (_transactions != null)
+            {
                 return _transactions;
+            }
+
             if (!name.HasValue())
+            {
                 name = null;
+            }
+
             string first, last;
             Util.NameSplit(name, out first, out last);
             var hasfirst = first.HasValue();
+            var roles = DbUtil.Db.CurrentRoles();
             nameid = name.ToInt();
             _transactions
                 = from t in DbUtil.Db.ViewTransactionLists
+                  join org in DbUtil.Db.Organizations on t.OrgId equals org.OrganizationId
                   let donate = t.Donate ?? 0
+                  where org.LimitToRole == null || roles.Contains(org.LimitToRole)
                   where t.Amt >= gtamount || gtamount == null
                   where t.Amt <= ltamount || ltamount == null
                   where description == null || t.Description.Contains(description)
@@ -113,12 +127,16 @@ namespace CmsWeb.Models
                   where (t.Financeonly ?? false) == false || finance
                   select t;
             if (name != null)
+            {
                 if (name == "0")
+                {
                     // special case, return no transactions, all we are interested in is the Senders on a Mission Trip
                     _transactions = from t in _transactions
                                     where t.OriginalId == nameid
                                     select t;
+                }
                 else
+                {
                     _transactions = from t in _transactions
                                     where
                                         (
@@ -127,16 +145,25 @@ namespace CmsWeb.Models
                                             )
                                         || t.Batchref == name || t.TransactionId == name || t.OriginalId == nameid || t.Id == nameid
                                     select t;
-            if (!HttpContext.Current.User.IsInRole("Finance"))
+                }
+            }
+
+            if (!HttpContextFactory.Current.User.IsInRole("Finance"))
+            {
                 _transactions = _transactions.Where(tt => (tt.Financeonly ?? false) == false);
+            }
 
             var edt = enddt;
             if (!edt.HasValue && startdt.HasValue)
-                edt = startdt;
-            edt = edt?.AddHours(24);
-            if (usebatchdates && startdt.HasValue)
             {
-                CheckBatchDates(startdt.Value, edt.Value);
+                edt = startdt;
+            }
+
+            edt = edt?.AddHours(24);
+            if (usebatchdates && startdt.HasValue && edt.HasValue)
+            {
+                // Apply an offset to the startdate to get those records that occurred prior to the batch date and haven't been batched at present
+                CheckBatchDates(startdt.Value.AddDays(-7), edt.Value);
                 _transactions = from t in _transactions
                                 where t.Batch >= startdt || startdt == null
                                 where t.Batch <= edt || edt == null
@@ -144,10 +171,17 @@ namespace CmsWeb.Models
                                 select t;
             }
             else
+            {
                 _transactions = from t in _transactions
                                 where t.TransactionDate >= startdt || startdt == null
                                 where t.TransactionDate <= edt || edt == null
                                 select t;
+            }
+
+            if (includesadditionaldonation)
+            {
+                _transactions = _transactions.Where(t => t.Donate > 0.00m);
+            }
             //			var q0 = _transactions.ToList();
             //            foreach(var t in q0)
             //                Debug.WriteLine("\"{0}\"\t{1}\t{2}", t.Description, t.Id, t.Amt);
@@ -190,7 +224,7 @@ namespace CmsWeb.Models
         public IQueryable<BatchDescriptionGroup> FetchTransactionsByBatchDescription()
         {
             var q = from t in FetchTransactions()
-                    group t by new {t.Batchref, t.Description}
+                    group t by new { t.Batchref, t.Description }
                     into g
                     let f = g.First()
                     orderby f.Batch, f.Description descending
@@ -206,151 +240,35 @@ namespace CmsWeb.Models
             return q;
         }
 
-        private static void CheckBatchDates(DateTime start, DateTime end)
+        private void CheckBatchDates(DateTime start, DateTime end)
         {
             var gateway = DbUtil.Db.Gateway();
             if (!gateway.CanGetSettlementDates)
+            {
                 return;
-
-            var response = gateway.GetBatchDetails(start, end);
-
-            // get distinct batches
-            var allBatchReferences = (from batchTran in response.BatchTransactions
-                                      select batchTran.BatchReference).Distinct();
-
-            // first filter out batches that we have already been updated or inserted.
-            // now find unmatched batch references
-            var unmatchedBatchReferences = allBatchReferences.Where(br => !DbUtil.Db.CheckedBatches.Any(tt => tt.BatchRef == br)).ToList();
-
-            // given unmatched batch references, get the matched batch transactions again
-            var unMatchedBatchTransactions =
-                response.BatchTransactions.Where(x => unmatchedBatchReferences.Contains(x.BatchReference)).ToList();
-
-
-            var batchTypes = unMatchedBatchTransactions.Select(x => x.BatchType).Distinct();
-
-            foreach (var batchType in batchTypes)
-            {
-                // key it by transaction reference and payment type.
-                var unMatchedKeyedByReference = unMatchedBatchTransactions.Where(x => x.BatchType == batchType).ToDictionary(x => x.Reference, x => x);
-
-                // next let's get all the approved matching transactions from our transaction table by transaction id (reference).
-                var approvedMatchingTransactions = from transaction in DbUtil.Db.Transactions
-                                                   where unMatchedKeyedByReference.Keys.Contains(transaction.TransactionId)
-                                                   where (transaction.PaymentType == null || transaction.PaymentType == (batchType == BatchType.Ach ? PaymentType.Ach : PaymentType.CreditCard))
-                                                   where transaction.Approved == true
-                                                   select transaction;
-
-                // next key the matching approved transactions that came from our transaction table by the transaction id (reference).
-                var distinctTransactionIds = approvedMatchingTransactions.Select(x => x.TransactionId).Distinct();
-
-                // finally let's get a list of all transactions that need to be inserted, which we don't already have.
-                var transactionsToInsert = from transaction in unMatchedKeyedByReference
-                                           where !distinctTransactionIds.Contains(transaction.Key)
-                                           select transaction.Value;
-
-                var notbefore = DateTime.Parse("6/1/12"); // the date when Sage payments began in BVCMS (?)
-
-                // spin through each transaction and insert them to the transaction table.
-                foreach (var transactionToInsert in transactionsToInsert)
-                {
-                    // get the original transaction.
-                    var originalTransaction = DbUtil.Db.Transactions.SingleOrDefault(t => t.TransactionId == transactionToInsert.Reference && transactionToInsert.TransactionDate >= notbefore && t.PaymentType == (batchType == BatchType.Ach ? PaymentType.Ach : PaymentType.CreditCard));
-
-                    // get the first and last name.
-                    string first, last;
-                    Util.NameSplit(transactionToInsert.Name, out first, out last);
-
-                    // get the settlement date, however we are not exactly sure why we add four hours to the settlement date.
-                    // we think it is to handle all timezones and push to the next day??
-                    var settlementDate = AdjustSettlementDateForAllTimeZones(transactionToInsert.SettledDate);
-
-                    // insert the transaction record.
-                    DbUtil.Db.Transactions.InsertOnSubmit(new Transaction
-                    {
-                        Name = transactionToInsert.Name,
-                        First = first,
-                        Last = last,
-                        TransactionId = transactionToInsert.Reference,
-                        Amt = transactionToInsert.TransactionType == TransactionType.Credit ||
-                              transactionToInsert.TransactionType == TransactionType.Refund
-                            ? -transactionToInsert.Amount
-                            : transactionToInsert.Amount,
-                        Approved = transactionToInsert.Approved,
-                        Message = transactionToInsert.Message,
-                        TransactionDate = transactionToInsert.TransactionDate,
-                        TransactionGateway = gateway.GatewayType,
-                        Settled = settlementDate,
-                        Batch = settlementDate, // this date now will be the same as the settlement date.
-                        Batchref = transactionToInsert.BatchReference,
-                        Batchtyp = transactionToInsert.BatchType == BatchType.Ach ? "eft" : "bankcard",
-                        OriginalId = originalTransaction != null ? (originalTransaction.OriginalId ?? originalTransaction.Id) : (int?) null,
-                        Fromsage = true,
-                        Description = originalTransaction != null ? originalTransaction.Description : $"no description from {gateway.GatewayType}, id={transactionToInsert.TransactionId}",
-                        PaymentType = transactionToInsert.BatchType == BatchType.Ach ? PaymentType.Ach : PaymentType.CreditCard,
-                        LastFourCC = transactionToInsert.BatchType == BatchType.CreditCard ? transactionToInsert.LastDigits : null,
-                        LastFourACH = transactionToInsert.BatchType == BatchType.Ach ? transactionToInsert.LastDigits : null
-                    });
-                }
-
-                // next update Existing transactions with new batch data if there are any.
-                foreach (var existingTransaction in approvedMatchingTransactions)
-                {
-                    if (!unMatchedKeyedByReference.ContainsKey(existingTransaction.TransactionId))
-                        continue;
-
-                    // first get the matching batch transaction.
-                    var batchTransaction = unMatchedKeyedByReference[existingTransaction.TransactionId];
-
-                    // get the adjusted settlement date
-                    var settlementDate = AdjustSettlementDateForAllTimeZones(batchTransaction.SettledDate);
-
-                    existingTransaction.Batch = settlementDate; // this date now will be the same as the settlement date.
-                    existingTransaction.Batchref = batchTransaction.BatchReference;
-                    existingTransaction.Batchtyp = batchTransaction.BatchType == BatchType.Ach ? "eft" : "bankcard";
-                    existingTransaction.Settled = settlementDate;
-                    existingTransaction.PaymentType = batchTransaction.BatchType == BatchType.Ach ? PaymentType.Ach : PaymentType.CreditCard;
-                    existingTransaction.LastFourCC = batchTransaction.BatchType == BatchType.CreditCard ? batchTransaction.LastDigits : null;
-                    existingTransaction.LastFourACH = batchTransaction.BatchType == BatchType.Ach ? batchTransaction.LastDigits : null;
-                }
             }
 
-
-            // finally we need to mark these batches as completed if there are any.
-            foreach (var batch in unMatchedBatchTransactions.DistinctBy(x => x.BatchReference))
+            if (gateway.UseIdsForSettlementDates)
             {
-                var checkedBatch = DbUtil.Db.CheckedBatches.SingleOrDefault(bb => bb.BatchRef == batch.BatchReference);
-                if (checkedBatch == null)
-                {
-                    DbUtil.Db.CheckedBatches.InsertOnSubmit(
-                        new CheckedBatch
-                        {
-                            BatchRef = batch.BatchReference,
-                            CheckedX = DateTime.Now
-                        });
-                }
-                else
-                    checkedBatch.CheckedX = DateTime.Now;
+                var tranids = (from t in _transactions
+                               where t.TransactionDate >= start
+                               where t.TransactionDate <= end
+                               where t.Settled == null
+                               where t.Moneytran == true
+                               select t.TransactionId).ToList();
+                gateway.CheckBatchSettlements(tranids);
             }
-
-            DbUtil.Db.SubmitChanges();
-        }
-
-        /// <summary>
-        ///     we are not exactly sure why we add four hours to the settlement date
-        ///     we think it is to handle all timezones and push to the next day??
-        /// </summary>
-        /// <param name="settlementDate"></param>
-        /// <returns></returns>
-        private static DateTime AdjustSettlementDateForAllTimeZones(DateTime settlementDate)
-        {
-            return settlementDate.AddHours(4);
+            else
+            {
+                gateway.CheckBatchSettlements(start, end);
+            }
         }
 
         public IQueryable<TransactionList> ApplySort()
         {
             var q = FetchTransactions();
             if (Pager.Direction == "asc")
+            {
                 switch (Pager.Sort)
                 {
                     case "Id":
@@ -394,7 +312,9 @@ namespace CmsWeb.Models
                             select t;
                         break;
                 }
+            }
             else
+            {
                 switch (Pager.Sort)
                 {
                     case "Id":
@@ -438,6 +358,7 @@ namespace CmsWeb.Models
                             select t;
                         break;
                 }
+            }
 
             return q;
         }
@@ -489,8 +410,24 @@ namespace CmsWeb.Models
                        SupporterId = sp.PeopleId,
                        GoerName = gp.Name,
                        GoerId = gp.PeopleId,
+                       OrgId = o.OrganizationId,
                        TripName = o.OrganizationName
                    };
+        }
+
+        public List<MissionTripBalanceInfo> MissionTripBalances()
+        {
+            var q = from gs in DbUtil.Db.GoerSenderAmounts
+                    where gs.GoerId == GoerId
+                    group gs by new { gs.GoerId, gs.OrgId, gs.Organization.OrganizationName } into g
+                    select new MissionTripBalanceInfo
+                    {
+                        GoerId = g.Key.GoerId ?? 0,
+                        OrgId = g.Key.OrgId,
+                        TripName = g.Key.OrganizationName,
+                        Balance = OrganizationMember.AmountDue(DbUtil.Db, g.Key.OrgId, g.Key.GoerId ?? 0)
+                    };
+            return q.ToList().Where(vv => vv.Balance > 0).ToList();
         }
 
         public IQueryable<SupporterInfo> SelfSupports()
@@ -509,6 +446,7 @@ namespace CmsWeb.Models
                        SupporterId = sp.PeopleId,
                        GoerName = gp.Name,
                        GoerId = gp.PeopleId,
+                       OrgId = o.OrganizationId,
                        TripName = o.OrganizationName
                    };
         }
@@ -529,6 +467,7 @@ namespace CmsWeb.Models
                        SupporterId = sp.PeopleId,
                        GoerName = gp.Name,
                        GoerId = gp.PeopleId,
+                       OrgId = o.OrganizationId,
                        TripName = o.OrganizationName
                    };
         }
@@ -579,7 +518,16 @@ namespace CmsWeb.Models
             public string SupporterName { get; set; }
             public int? GoerId { get; set; }
             public int? SupporterId { get; set; }
+            public int? OrgId { get; set; }
             public string TripName { get; set; }
+        }
+
+        public class MissionTripBalanceInfo
+        {
+            public int GoerId { get; set; }
+            public int OrgId { get; set; }
+            public string TripName { get; set; }
+            public decimal Balance { get; set; }
         }
     }
 }

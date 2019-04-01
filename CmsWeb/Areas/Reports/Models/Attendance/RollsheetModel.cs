@@ -5,14 +5,13 @@
  * You may obtain a copy of the License at http://bvcms.codeplex.com/license 
  */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using UtilityExtensions;
 using CmsData;
 using CmsData.Codes;
-using CmsData.View;
+using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Linq;
+using UtilityExtensions;
 
 namespace CmsWeb.Areas.Reports.Models
 {
@@ -23,7 +22,10 @@ namespace CmsWeb.Areas.Reports.Models
             public int PeopleId { get; set; }
             public string Name { get; set; }
             public string Name2 { get; set; }
-            public string BirthDate { get; set; }
+            public string BirthDate => Person.FormatBirthday(BirthYear, BirthMon, BirthDay, PeopleId);
+            public int? BirthYear { get; set; }
+            public int? BirthMon { get; set; }
+            public int? BirthDay { get; set; }
             public string Age { get; set; }
             public string Address { get; set; }
             public string Address2 { get; set; }
@@ -58,11 +60,15 @@ namespace CmsWeb.Areas.Reports.Models
             public string NameParent2 { get; set; }
         }
 
+        public RollsheetModel() { }
         // This gets current org members
         public static IEnumerable<PersonMemberInfo> FetchOrgMembers(int orgid, int[] groups)
         {
             if (groups == null)
-                groups = new int[] {0};
+            {
+                groups = new int[] { 0 };
+            }
+
             var tagownerid = Util2.CurrentTagOwnerId;
             var q = from om in DbUtil.Db.OrganizationMembers
                     where om.OrganizationId == orgid
@@ -80,10 +86,9 @@ namespace CmsWeb.Areas.Reports.Models
                         PeopleId = p.PeopleId,
                         Name = p.Name,
                         Name2 = p.Name2,
-                        BirthDate = Util.FormatBirthday(
-                            p.BirthYear,
-                            p.BirthMonth,
-                            p.BirthDay),
+                        BirthYear = p.BirthYear,
+                        BirthMon = p.BirthMonth,
+                        BirthDay = p.BirthDay,
                         Address = p.PrimaryAddress,
                         Address2 = p.PrimaryAddress2,
                         CityStateZip = Util.FormatCSZ(p.PrimaryCity, p.PrimaryState, p.PrimaryZip),
@@ -95,7 +100,7 @@ namespace CmsWeb.Areas.Reports.Models
                         Email = p.EmailAddress,
                         BFTeacher = p.BFClass.LeaderName,
                         BFTeacherId = p.BFClass.LeaderId,
-                        Age = p.Age.ToString(),
+                        Age = Person.AgeDisplay(p.Age, p.PeopleId).ToString(),
                         MemberTypeCode = om.MemberType.Code,
                         MemberType = om.MemberType.Description,
                         MemberTypeId = om.MemberTypeId,
@@ -115,6 +120,7 @@ namespace CmsWeb.Areas.Reports.Models
             var tagownerid = Util2.CurrentTagOwnerId;
             IEnumerable<PersonMemberInfo> q = null;
             if (CurrentMembers)
+            {
                 q = from m in DbUtil.Db.OrganizationMembers
                     where m.OrganizationId == OrganizationId
                     let p = m.Person
@@ -127,10 +133,9 @@ namespace CmsWeb.Areas.Reports.Models
                         PeopleId = p.PeopleId,
                         Name = p.Name,
                         Name2 = p.Name2,
-                        BirthDate = Util.FormatBirthday(
-                            p.BirthYear,
-                            p.BirthMonth,
-                            p.BirthDay),
+                        BirthYear = p.BirthYear,
+                        BirthMon = p.BirthMonth,
+                        BirthDay = p.BirthDay,
                         Address = p.PrimaryAddress,
                         Address2 = p.PrimaryAddress2,
                         CityStateZip = Util.FormatCSZ(p.PrimaryCity, p.PrimaryState, p.PrimaryZip),
@@ -142,13 +147,15 @@ namespace CmsWeb.Areas.Reports.Models
                         Email = p.EmailAddress,
                         BFTeacher = p.BFClass.LeaderName,
                         BFTeacherId = p.BFClass.LeaderId,
-                        Age = p.Age.ToString(),
+                        Age = Person.AgeDisplay(p.Age, p.PeopleId).ToString(),
                         MemberTypeCode = m.MemberType.Code,
                         MemberType = m.MemberType.Description,
                         MemberTypeId = m.MemberTypeId,
                         Joined = m.EnrollmentDate
                     };
+            }
             else
+            {
                 q = from m in DbUtil.Db.OrgMembersAsOfDate(OrganizationId, MeetingDate)
                     orderby m.LastName, m.FamilyId, m.PreferredName
                     select new PersonMemberInfo
@@ -156,10 +163,9 @@ namespace CmsWeb.Areas.Reports.Models
                         PeopleId = m.PeopleId,
                         Name = m.PreferredName + " " + m.LastName,
                         Name2 = m.LastName + ", " + m.PreferredName,
-                        BirthDate = Util.FormatBirthday(
-                            m.BirthYear,
-                            m.BirthMonth,
-                            m.BirthDay),
+                        BirthYear = m.BirthYear,
+                        BirthMon = m.BirthMonth,
+                        BirthDay = m.BirthDay,
                         Address = m.PrimaryAddress,
                         Address2 = m.PrimaryAddress2,
                         CityStateZip = Util.FormatCSZ(m.PrimaryCity, m.PrimaryState, m.PrimaryZip),
@@ -170,15 +176,17 @@ namespace CmsWeb.Areas.Reports.Models
                         Email = m.EmailAddress,
                         BFTeacher = m.BFTeacher,
                         BFTeacherId = m.BFTeacherId,
-                        Age = m.Age.ToString(),
+                        Age = Person.AgeDisplay(m.Age, m.PeopleId).ToString(),
                         MemberType = m.MemberType,
                         MemberTypeId = m.MemberTypeId,
                         Joined = m.Joined
                     };
+            }
+
             return q;
         }
 
-        private static int[] VisitAttendTypes = new int[]
+        private static readonly int[] VisitAttendTypes = new int[]
         {
             AttendTypeCode.VisitingMember,
             AttendTypeCode.RecentVisitor,
@@ -196,10 +204,9 @@ namespace CmsWeb.Areas.Reports.Models
                         PeopleId = p.PeopleId,
                         Name = p.PreferredName + " " + p.LastName,
                         Name2 = p.LastName + ", " + p.PreferredName,
-                        BirthDate = Util.FormatBirthday(
-                            p.BirthYear,
-                            p.BirthMonth,
-                            p.BirthDay),
+                        BirthYear = p.BirthYear,
+                        BirthMon = p.BirthMonth,
+                        BirthDay = p.BirthDay,
                         Address = p.PrimaryAddress,
                         Address2 = p.PrimaryAddress2,
                         CityStateZip = Util.FormatCSZ(p.PrimaryCity, p.PrimaryState, p.PrimaryZip),
@@ -210,9 +217,18 @@ namespace CmsWeb.Areas.Reports.Models
                         Email = p.Email,
                         BFTeacher = p.BFTeacher,
                         BFTeacherId = p.BFTeacherId,
-                        Age = p.Age.ToString(),
+                        Age = Person.AgeDisplay(p.Age, p.PeopleId).ToString(),
                         LastAttended = p.LastAttended,
                     };
+            return q;
+        }
+        public static IEnumerable<Person> FetchVisitorPeople(int orgid, DateTime meetingDate, bool noCurrentMembers)
+        {
+            var q = from vp in DbUtil.Db.OrgVisitorsAsOfDate(orgid, meetingDate, noCurrentMembers)
+                    join p in DbUtil.Db.People on vp.PeopleId equals p.PeopleId into peeps
+                    from p in peeps
+                    orderby p.LastName, p.FamilyId, p.PreferredName
+                    select p;
             return q;
         }
 
@@ -240,13 +256,17 @@ namespace CmsWeb.Areas.Reports.Models
             var q = DbUtil.Db.RollListFilteredBySubgroups(meetingId, meetingDate, orgId, currentMembers, fromMobile, subgroupIds, includeLeaderless);
 
             if (sortByName)
+            {
                 q = from p in q
                     orderby p.Name
                     select p;
+            }
             else
+            {
                 q = from p in q
                     orderby p.Section, p.Last, p.FamilyId, p.First
                     select p;
+            }
 
             var q2 = from p in q
                      select new AttendInfo()
@@ -275,17 +295,24 @@ namespace CmsWeb.Areas.Reports.Models
             var q = DbUtil.Db.RollList(meetingId, meetingDate, orgId, currentMembers, fromMobile);
 
             if (sortByName)
+            {
                 q = from p in q
                     orderby p.Name
                     select p;
+            }
             else
+            {
                 q = from p in q
                     orderby p.Section, p.Last, p.FamilyId, p.First
                     select p;
+            }
+
             if (registeredOnly)
+            {
                 q = from p in q
                     where AttendCommitmentCode.committed.Contains(p.CommitmentId ?? 0)
                     select p;
+            }
 
             var q2 = from p in q
                      select new AttendInfo()
@@ -315,18 +342,24 @@ namespace CmsWeb.Areas.Reports.Models
                     select p;
 
             if (sortByName)
+            {
                 q = from p in q
                     orderby p.Name
                     select p;
+            }
             else
+            {
                 q = from p in q
                     orderby p.Section, p.Last, p.FamilyId, p.First
                     select p;
+            }
 
             if (registeredOnly)
+            {
                 q = from p in q
                     where AttendCommitmentCode.committed.Contains(p.CommitmentId ?? 0)
                     select p;
+            }
 
             var q2 = from p in q
                      select new AttendInfo()

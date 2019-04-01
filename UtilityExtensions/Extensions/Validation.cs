@@ -34,6 +34,11 @@ namespace UtilityExtensions
             return i;
         }
 
+        public static string ToNull(this string value)
+        {
+            return value.HasValue() ? value : null;
+        }
+
         public static bool Has(this object obj, string propertyName)
         {
             var dynamic = obj as DynamicObject;
@@ -79,20 +84,27 @@ namespace UtilityExtensions
             var patt = new Regex("[^0-9]");
             return !(patt.IsMatch(str));
         }
+		public static bool AllDigitsCommas(this string str)
+		{
+            if (!str.HasValue())
+                return false;
+			var patt = new Regex("[^0-9,]");
+			return !patt.IsMatch(str);
+		}
 
         private const string STR_Culture = "Culture";
         public static string Culture
         {
             get
             {
-                if (HttpContext.Current != null)
-                    if (HttpContext.Current.Items[STR_Culture] != null)
-                        return (string)HttpContext.Current.Items[STR_Culture];
+                if (HttpContextFactory.Current != null)
+                    if (HttpContextFactory.Current.Items[STR_Culture] != null)
+                        return (string)HttpContextFactory.Current.Items[STR_Culture];
                 return null;
             }
             set
             {
-                HttpContext.Current.Items[STR_Culture] = value;
+                HttpContextFactory.Current.Items[STR_Culture] = value;
             }
         }
 
@@ -198,8 +210,8 @@ namespace UtilityExtensions
 
         public static bool IsInRole(string role)
         {
-            if (HttpContext.Current != null)
-                return HttpContext.Current.User.IsInRole(role);
+            if (HttpContextFactory.Current != null)
+                return HttpContextFactory.Current.User.IsInRole(role);
             return false;
         }
     }

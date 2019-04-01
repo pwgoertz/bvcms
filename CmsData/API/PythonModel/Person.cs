@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Web;
 using CmsData.API;
@@ -73,12 +74,12 @@ namespace CmsData
         }
         public void AddTag(object query, string tagName, int ownerId)
         {
-            var list = PeopleIds(query);
-            var db2 = NewDataContext();
-            foreach (var pid in list)
-                Person.Tag(db2, pid, tagName, ownerId, DbUtil.TagTypeId_Personal);
-            db2.SubmitChanges();
-            db2.Dispose();
+            using (var db2 = NewDataContext())
+            {
+                foreach (var pid in db2.PeopleQueryIds(query))
+                    Person.Tag(db2, pid, tagName, ownerId, DbUtil.TagTypeId_Personal);
+                db2.SubmitChanges();
+            }
         }
 
         public int? AgeInMonths(DateTime? birthdate, DateTime asof)
@@ -114,17 +115,17 @@ namespace CmsData
                 db2.SubmitChanges();
                 var taskLink = Task.TaskLink(db2, description, t.Id);
                 db2.Email(
-                    db2.Setting("AdminMail", "support@touchpointsoftware.com"), // from email
+                    db2.Setting("AdminMail",ConfigurationManager.AppSettings["supportemail"]), // from email
                     minister, // to person
                     "TASK: " + description, // subject
-                    $@"{taskLink}<br/>\n{about.Name}\n<p>{notes}</p>"); // body
+                    $@"{taskLink}<br/>{about.Name}<p>{notes}</p>"); // body
                 db2.SubmitChanges();
             }
         }
 
         public void DeletePeople(object query)
         {
-            if (!HttpContext.Current.User.IsInRole("developer"))
+            if (!HttpContextFactory.Current.User.IsInRole("developer"))
                 db.LogActivity("Python DeletePerson {query} denied");
 
             var list = PeopleIds(query);
@@ -154,8 +155,7 @@ namespace CmsData
 
         public List<int> PeopleIds(object query)
         {
-            var list = db.PeopleQuery2(query).Select(ii => ii.PeopleId).ToList();
-            return list;
+            return db.PeopleQueryIds(query);
         }
 
         public void RemoveRole(object query, string role)
@@ -173,7 +173,7 @@ namespace CmsData
                         var newroles = oldroles.Where(rr => !rr.Equal(role)).ToArray();
                         if (newroles.Length == oldroles.Length)
                             continue;
-                        user.SetRoles(db2, newroles);
+                        user.SetRoles(db2, newroles, log: false);
                         db2.SubmitChanges();
                     }
                 }
@@ -185,12 +185,12 @@ namespace CmsData
             var str = campus as string;
             using (var db2 = NewDataContext())
             {
-                var q = db2.PeopleQuery2(query);
                 var id = campus is int || str.AllDigits()
                     ? campus.ToInt()
                     : db2.FetchOrCreateCampusId(str);
                 if (id == 0)
                     return;
+                var q = db2.PeopleQuery2(query);
                 foreach (var p in q)
                 {
                     p.UpdateValue("CampusId", id);
@@ -307,40 +307,85 @@ namespace CmsData
 
         public void UpdateContributionOption(object query, int option)
         {
-            var list = db.PeopleQuery2(query).Select(ii => ii.PeopleId).ToList();
-            foreach (var pid in list)
+            using (var db2 = NewDataContext())
             {
-                var db2 = NewDataContext();
-                var p = db2.LoadPersonById(pid);
-                p.UpdateContributionOption(db2, option);
-                db2.SubmitChanges();
-                db2.Dispose();
+                var list = db2.PeopleQuery2(query);
+                foreach (var p in list)
+                {
+                    p.UpdateContributionOption(db2, option);
+                    db2.SubmitChanges();
+                }
             }
         }
 
         public void UpdateEnvelopeOption(object query, int option)
         {
-            var list = db.PeopleQuery2(query).Select(ii => ii.PeopleId).ToList();
-            foreach (var pid in list)
+            using (var db2 = NewDataContext())
             {
-                var db2 = NewDataContext();
-                var p = db2.LoadPersonById(pid);
-                p.UpdateEnvelopeOption(db2, option);
-                db2.SubmitChanges();
-                db2.Dispose();
+                var list = db.PeopleQuery2(query);
+                foreach (var p in list)
+                {
+                    p.UpdateEnvelopeOption(db2, option);
+                    db2.SubmitChanges();
+                }
             }
         }
 
         public void UpdateElectronicStatement(object query, bool tf)
         {
-            var list = db.PeopleQuery2(query).Select(ii => ii.PeopleId).ToList();
-            foreach (var pid in list)
+            using(var db2 = NewDataContext())
             {
-                var db2 = NewDataContext();
-                var p = db2.LoadPersonById(pid);
-                p.UpdateElectronicStatement(db2, tf);
-                db2.SubmitChanges();
-                db2.Dispose();
+                var list = db2.PeopleQuery2(query);
+                foreach (var p in list)
+                {
+                    p.UpdateElectronicStatement(db2, tf);
+                    db2.SubmitChanges();
+                }
+            }
+        }
+        public Person FindAddPerson(string first, string last, string dob, string email, string phone)
+        {
+            return Person.FindAddPerson(db, "python", first, last, dob, email, phone);
+        }
+        public Person FindAddPerson(dynamic first, dynamic last, dynamic dob, dynamic email, dynamic phone)
+        {
+            return FindAddPerson((string)first, (string)last, (string)dob, (string)email, (string)phone);
+        }
+        public int FindAddPeopleId(dynamic first, dynamic last, dynamic dob, dynamic email, dynamic phone)
+        {
+            return FindAddPerson((string)first, (string)last, (string)dob, (string)email, (string)phone).PeopleId;
+        }
+        public int? FindPersonId(dynamic first, dynamic last, dynamic dob, dynamic email, dynamic phone)
+        {
+            string digits = (string)phone;
+
+            var list = db.FindPerson((string)first, (string)last, null, (string)email, digits.GetDigits()).ToList();
+            if (list.Count > 0)
+            {
+                return list[0].PeopleId ?? 0;
+            }
+            else
+            {
+                return null;
+            }
+        }
+        public int? FindPersonId(dynamic fullName, dynamic dob, dynamic email, dynamic phone)
+        {
+            string digits = (string)phone;
+            string first = null, last = null;
+            Util.NameSplit(fullName, out first, out last);
+            return FindPersonId(first, last, dob, email, phone);
+        }
+        public int? FindPersonIdExtraValue(string extraKey, string extraValue)
+        {
+            var list = db.FindPersonByExtraValue((string)extraKey, (string)extraValue).ToList();
+            if (list.Count > 0)
+            {
+                return list[0].PeopleId ?? 0;
+            }
+            else
+            {
+                return null;
             }
         }
     }

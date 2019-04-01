@@ -17,37 +17,16 @@ namespace UtilityExtensions
 {
     public static partial class Util
     {
-        public static string FormatBirthday(int? y, int? m, int? d)
-        {
-            return FormatBirthday(y, m, d, "");
-        }
-
-        public static string FormatBirthday(int? y, int? m, int? d, string def)
-        {
-            try
-            {
-                if (m.HasValue && d.HasValue)
-                    if (!y.HasValue)
-                        return new DateTime(2000, m.Value, d.Value).ToString("m");
-                    else
-                        return new DateTime(y.Value, m.Value, d.Value).ToString("d");
-                if (y.HasValue)
-                    if (m.HasValue && !d.HasValue)
-                        return new DateTime(y.Value, m.Value, 1).ToString("y");
-                    else
-                        return y.ToString();
-            }
-            catch (Exception)
-            {
-                return $"bad date {m ?? 0}/{d ?? 0}/{y ?? 0}";
-            }
-            return def;
-        }
-
         public static string FormatDate(this DateTime? dt)
         {
             if (dt.HasValue)
                 return dt.Value.ToString("d");
+            return "";
+        }
+        public static string FormatDateUS(this DateTime? dt)
+        {
+            if (dt.HasValue)
+                return dt.Value.ToString("d", CultureInfo.CreateSpecificCulture("en-US"));
             return "";
         }
 
@@ -57,8 +36,10 @@ namespace UtilityExtensions
             {
                 if (prefix != null)
                     prefix = prefix + " ";
-                var s = dt.Value.ToString("d");
-                return new HtmlString($"{prefix}{s.Substring(0, s.Length - 4) + s.Substring(s.Length - 2, 2)}{suffix}");
+                string dateFormat = Thread.CurrentThread.CurrentCulture.DateTimeFormat.ShortDatePattern.Replace("yyyy", "yy");
+                var s = dt.Value.ToString(dateFormat);
+                var d = new HtmlString($"{prefix}{s}{suffix}");
+                return d;
             }
             return new HtmlString("");
         }
@@ -69,6 +50,27 @@ namespace UtilityExtensions
             if (dt.HasValue)
                 return dt.Value.ToString("d");
             return "";
+        }
+        public static string FmtBirthday(int? y, int? m, int? d, string def = "")
+        {
+            try
+            {
+                if (m.HasValue && d.HasValue)
+                    if (!y.HasValue)
+                        return new DateTime(2000, m.Value, d.Value).ToString("m");
+                    else
+                        return new DateTime(y.Value, m.Value, d.Value).ToString("d");
+                if (y.HasValue)
+                    if (m.HasValue)
+                        return new DateTime(y.Value, m.Value, 1).ToString("y");
+                    else
+                        return y.ToString();
+            }
+            catch (Exception)
+            {
+                return $"bad date {m ?? 0}/{d ?? 0}/{y ?? 0}";
+            }
+            return def;
         }
 
         public static string ToSortableDateTime(this DateTime dt)
@@ -124,6 +126,12 @@ namespace UtilityExtensions
         public static string FormatDateTm(this DateTime? dt)
         {
             return dt.FormatDateTm(null);
+        }
+        public static string FormatDateTmUS(this DateTime? dt, string def = null)
+        {
+            if (dt.HasValue)
+                return dt.Value.ToString("g", CultureInfo.CreateSpecificCulture("en-US"));
+            return def;
         }
 
         public static string FormatDateTm(this DateTime? dt, string def)

@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using CmsData;
+using CmsData.Codes;
+using CmsWeb.Code;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
-using CmsData;
-using CmsData.Codes;
-using CmsWeb.Code;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.People.Models
@@ -33,7 +33,10 @@ namespace CmsWeb.Areas.People.Models
             get
             {
                 if (person == null && PeopleId.HasValue)
+                {
                     person = DbUtil.Db.LoadPersonById(PeopleId.Value);
+                }
+
                 return person;
             }
         }
@@ -64,6 +67,7 @@ namespace CmsWeb.Areas.People.Models
 
         [UIHint("Textarea"), DisplayName("Registration Log")]
         public string Comments { get; set; }
+        public bool ShowComments { get; set; }
 
         public bool Tylenol { get; set; }
         public bool Advil { get; set; }
@@ -84,10 +88,17 @@ namespace CmsWeb.Areas.People.Models
         [DisplayName("Coaching Interest")]
         public bool Coaching { get; set; }
 
-        public void UpdateModel()
+        public void UpdateModel(bool ExcludeComments)
         {
             var rr = Person.SetRecReg();
-            this.CopyPropertiesTo(rr);
+            if (ExcludeComments)
+            {
+                this.CopyPropertiesTo(rr, null, "", "Comments");
+            }
+            else
+            {
+                this.CopyPropertiesTo(rr);
+            }
             Person.CustodyIssue = CustodyIssue;
             Person.OkTransport = OkTransport;
 
@@ -105,9 +116,10 @@ namespace CmsWeb.Areas.People.Models
                     select new GoerItem
                     {
                         Id = m.OrganizationId,
-                        Trip = m.Organization.OrganizationName,
+                        Trip = m.Organization?.OrganizationName,
                         Cost = ts.TripCost ?? 0,
-                        Paid = ts.Raised ?? 0
+                        Paid = ts.Raised ?? 0,
+                        ShowFundingLink = m.Organization?.TripFundingPagesEnable ?? false
                     }).ToList();
         }
 
@@ -117,6 +129,7 @@ namespace CmsWeb.Areas.People.Models
             public string Trip { get; set; }
             public decimal Cost { get; set; }
             public decimal Paid { get; set; }
+            public bool ShowFundingLink { get; set; }
         }
     }
 }

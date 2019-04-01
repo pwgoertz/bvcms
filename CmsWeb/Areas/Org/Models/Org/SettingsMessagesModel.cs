@@ -1,15 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Linq.Expressions;
-using System.Reflection;
-using CmsData;
-using CmsData.Codes;
+﻿using CmsData;
 using CmsData.Registration;
 using CmsWeb.Code;
-using UtilityExtensions;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 
 namespace CmsWeb.Areas.Org.Models
 {
@@ -23,7 +16,9 @@ namespace CmsWeb.Areas.Org.Models
             set
             {
                 if (Org == null)
+                {
                     Org = DbUtil.Db.LoadOrganizationById(value);
+                }
             }
         }
 
@@ -36,31 +31,31 @@ namespace CmsWeb.Areas.Org.Models
             Id = id;
             this.CopyPropertiesFrom(Org, typeof(OrgAttribute));
             this.CopyPropertiesFrom(RegSettings, typeof(RegAttribute));
-//            if (formatHtml)
-//            {
-//                FormatHtml(x => x.Body);
-//                FormatHtml(x => x.ReminderBody);
-//                FormatHtml(x => x.SenderBody);
-//                FormatHtml(x => x.SupportBody);
-//                FormatHtml(x => x.InstructionSpecial);
-//                FormatHtml(x => x.InstructionFind);
-//                FormatHtml(x => x.InstructionLogin);
-//                FormatHtml(x => x.InstructionOptions);
-//                FormatHtml(x => x.InstructionSelect);
-//                FormatHtml(x => x.InstructionSorry);
-//                FormatHtml(x => x.InstructionSubmit);
-//            }
+            //            if (formatHtml)
+            //            {
+            //                FormatHtml(x => x.Body);
+            //                FormatHtml(x => x.ReminderBody);
+            //                FormatHtml(x => x.SenderBody);
+            //                FormatHtml(x => x.SupportBody);
+            //                FormatHtml(x => x.InstructionSpecial);
+            //                FormatHtml(x => x.InstructionFind);
+            //                FormatHtml(x => x.InstructionLogin);
+            //                FormatHtml(x => x.InstructionOptions);
+            //                FormatHtml(x => x.InstructionSelect);
+            //                FormatHtml(x => x.InstructionSorry);
+            //                FormatHtml(x => x.InstructionSubmit);
+            //            }
         }
 
-//        void FormatHtml(Expression<Func<SettingsMessagesModel, string>> o)
-//        {
-//            var expr = (MemberExpression)o.Body;
-//            var prop = (PropertyInfo)expr.Member;
-//            var s = prop.GetValue(this) as string;
-//            if (!s.HasValue())
-//                return;
-//            prop.SetValue(this, TidyLib.FormatHtml(s));
-//        }
+        //        void FormatHtml(Expression<Func<SettingsMessagesModel, string>> o)
+        //        {
+        //            var expr = (MemberExpression)o.Body;
+        //            var prop = (PropertyInfo)expr.Member;
+        //            var s = prop.GetValue(this) as string;
+        //            if (!s.HasValue())
+        //                return;
+        //            prop.SetValue(this, TidyLib.FormatHtml(s));
+        //        }
         public void Update()
         {
             this.CopyPropertiesTo(Org, typeof(OrgAttribute));
@@ -140,6 +135,9 @@ namespace CmsWeb.Areas.Org.Models
         [Reg]
         public string SenderBody { get; set; }
 
+        [Reg, Display(Description = SenderDescription)]
+        public string ConfirmationTrackingCode { get; set; }
+
 
         #region Descriptions
 
@@ -182,7 +180,7 @@ This message appears on the registration page whenever someone cannot register:
 * When it is checked as Filled 
 * It is prior to the Registration Start Date.
 
-see [this help article](http://docs.touchpointsoftware.com/OnlineRegistration/MessagesSettings.html)
+see [this help article](https://docs.touchpointsoftware.com/OnlineRegistration/MessagesSettings.html)
 ";
         private const string TermsDescription = @"
 Some registrations like a camp, or sports team, or a trip require you to agree to terms (indemnification).
@@ -209,6 +207,9 @@ This is the email that is sent to solicit supporters.
 ";
         private const string SenderDescription = @"
 This is the email that is sent to notify senders.
+";
+        private const string ConfirmationTrackingDescription = @"
+You put the name of the special content that contains the javascript code here.
 ";
 
         #endregion

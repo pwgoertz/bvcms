@@ -1,11 +1,11 @@
+using CmsData;
+using CmsData.View;
+using MoreLinq;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Text;
-using CmsData;
-using CmsData.View;
-using MoreLinq;
 using UtilityExtensions;
 
 namespace CmsWeb.Models
@@ -14,12 +14,12 @@ namespace CmsWeb.Models
     {
         public static EpplusResult InvolvementList(Guid queryid)
         {
-            var db = DbUtil.Db;
-            var nocheckrole = db.Setting("AllowLimitToRoleForInvolvementExport", "false").ToBool();
-            var q = db.PeopleQuery(queryid);
+            //var db = Db;
+            var nocheckrole = DbUtil.Db.Setting("AllowLimitToRoleForInvolvementExport", "false").ToBool();
+            var q = DbUtil.Db.PeopleQuery(queryid);
             var q2 = from p in q
                      orderby p.LastName, p.FirstName
-                     let spouse = db.People.SingleOrDefault(w => p.SpouseId == w.PeopleId)
+                     let spouse = DbUtil.Db.People.SingleOrDefault(w => p.SpouseId == w.PeopleId)
                      let om = p.OrganizationMembers.SingleOrDefault(m => m.OrganizationId == p.BibleFellowshipClassId)
                      select new InvolvementInfo
                      {
@@ -39,7 +39,7 @@ namespace CmsWeb.Models
                          Teacher = p.BFClass.LeaderName,
                          MemberType = om.MemberType.Description,
                          AttendPct = om.AttendPct,
-                         Age = p.Age ?? 0,
+                         AgeDb = p.Age,
                          Spouse = spouse != null ? spouse.FirstName : "",
                          activities = (from m in p.OrganizationMembers
                                        where nocheckrole || (m.Organization.LimitToRole ?? "") == ""
@@ -55,7 +55,7 @@ namespace CmsWeb.Models
                          LastName = p.LastName,
                          FirstName = p.PreferredName,
                          Campus = p.Campu.Description,
-                         CampusDate = db.LastChanged(p.PeopleId, "CampusId").FormatDate()
+                         CampusDate = DbUtil.Db.LastChanged(p.PeopleId, "CampusId").FormatDate()
                      };
             var list = q2.ToList();
             return ExcelExportModel.ToDataTable(list).ToExcel("Involvements.xlsx");
@@ -78,14 +78,14 @@ namespace CmsWeb.Models
                          State = p.PrimaryState,
                          Zip = p.PrimaryZip.FmtZip(),
                          Email = p.EmailAddress,
-                         BirthDate = Util.FormatBirthday(p.BirthYear, p.BirthMonth, p.BirthDay),
+                         BirthDate = Person.FormatBirthday(p.BirthYr, p.BirthMonth, p.BirthDay, p.PeopleId),
                          JoinDate = p.JoinDate.FormatDate(),
                          HomePhone = p.HomePhone.FmtFone(),
                          CellPhone = p.CellPhone.FmtFone(),
                          WorkPhone = p.WorkPhone.FmtFone(),
                          MemberStatus = p.MemberStatus.Description,
                          FellowshipLeader = p.BFClass.LeaderName,
-                         Age = p.Age.ToString(),
+                         Age = Person.AgeDisplay(p.Age, p.PeopleId).ToString(),
                          School = p.SchoolOther,
                          Grade = p.Grade.ToString(),
                          EmContact = rr.Emcontact,
@@ -112,12 +112,12 @@ namespace CmsWeb.Models
                          State = p.PrimaryState,
                          Zip = p.PrimaryZip.FmtZip(),
                          Email = p.EmailAddress,
-                         BirthDate = Util.FormatBirthday(p.BirthYear, p.BirthMonth, p.BirthDay),
+                         BirthDate = Person.FormatBirthday(p.BirthYr, p.BirthMonth, p.BirthDay, p.PeopleId),
                          HomePhone = p.HomePhone.FmtFone(),
                          CellPhone = p.CellPhone.FmtFone(),
                          WorkPhone = p.WorkPhone.FmtFone(),
                          FellowshipLeader = p.BFClass.LeaderName,
-                         Age = p.Age.ToString(),
+                         Age = Person.AgeDisplay(p.Age, p.PeopleId).ToString(),
                          MemberStatus = p.MemberStatus.Description,
                          DropType = p.DropType.Description,
                          DropDate = p.DropDate.FormatDate(),
@@ -151,14 +151,14 @@ namespace CmsWeb.Models
                          State = p.PrimaryState,
                          Zip = p.PrimaryZip.FmtZip(),
                          Email = p.EmailAddress,
-                         BirthDate = Util.FormatBirthday(p.BirthYear, p.BirthMonth, p.BirthDay),
+                         BirthDate = Person.FormatBirthday(p.BirthYr, p.BirthMonth, p.BirthDay, p.PeopleId),
                          JoinDate = p.JoinDate.FormatDate(),
                          HomePhone = p.HomePhone.FmtFone(),
                          CellPhone = p.CellPhone.FmtFone(),
                          WorkPhone = p.WorkPhone.FmtFone(),
                          MemberStatus = p.MemberStatus.Description,
                          FellowshipLeader = p.BFClass.LeaderName,
-                         Age = p.Age.ToString(),
+                         Age = Person.AgeDisplay(p.Age, p.PeopleId).ToString(),
                          School = p.SchoolOther,
                          Grade = p.Grade.ToString(),
                          LastAttend = bfm.LastAttended.ToString(),
@@ -168,23 +168,11 @@ namespace CmsWeb.Models
             return q2.Take(maximumRows).ToDataTable().ToExcel("AttendList.xlsx");
         }
 
-        //        public static IEnumerable OrgMemberList2(int qid)
-        //        {
-        //            var q = DbUtil.Db.PeopleQuery(qid);
-        //            var q2 = q.Select(p => new
-        //            {
-        //                om = DbUtil.Db.OrganizationMembers.SingleOrDefault(om => om.OrganizationId == Util2.CurrentOrgId && om.PeopleId == p.PeopleId),
-        //                rr = p.RecRegs.FirstOrDefault(),
-        //                p = p,
-        //                test = p.PeopleExtras.SingleOrDefault(vv => vv.Field == "test")
-        //            });
-        //            var q3 = q2.Select("new(p.PreferredName,p.LastName,om.AttendStr,om.AmountPaid)");
-        //            return q3;
-        //        }
-        public static EpplusResult OrgMemberListGroups()
+        public static EpplusResult OrgMemberListGroups(Guid queryid)
         {
+            var filter = DbUtil.Db.OrgFilter(queryid);
             var cmd = new SqlCommand(
-                $"dbo.OrgMembers {DbUtil.Db.CurrentOrg.Id}, '{DbUtil.Db.CurrentOrg.SgFilter}'");
+                $"dbo.OrgMembers {filter.Id}, '{filter.SgFilter}'");
             cmd.Connection = new SqlConnection(Util.ConnectionString);
             cmd.Connection.Open();
             return cmd.ExecuteReader().ToExcel("OrgMemberGroups.xlsx");
@@ -192,16 +180,17 @@ namespace CmsWeb.Models
 
         public static IEnumerable<CurrOrgMember> OrgMemberList(int orgid)
         {
-            var Db = DbUtil.Db;
-            return Db.CurrOrgMembers(orgid.ToString());
+            //var Db = Db;
+            return DbUtil.Db.CurrOrgMembers(orgid.ToString());
         }
 
         public static EpplusResult PromoList(Guid queryid, int maximumRows)
         {
-            var Db = DbUtil.Db;
-            var q = Db.PeopleQuery(queryid);
+            //var db = Db;
+            var filter = DbUtil.Db.OrgFilter(queryid);
+            var q = DbUtil.Db.PeopleQuery(queryid);
             var q2 = from p in q
-                     let bfm = Db.OrganizationMembers.SingleOrDefault(om => om.OrganizationId == DbUtil.Db.CurrentOrg.Id && om.PeopleId == p.PeopleId)
+                     let bfm = DbUtil.Db.OrganizationMembers.SingleOrDefault(om => om.OrganizationId == filter.Id && om.PeopleId == p.PeopleId)
                      let sc = bfm.Organization.OrgSchedules.FirstOrDefault() // SCHED
                      let tm = sc.SchedTime.Value
                      select new
@@ -270,11 +259,20 @@ namespace CmsWeb.Models
                 {
                     var sb = new StringBuilder();
                     if (MemberInfoRaw.HasValue())
+                    {
                         sb.Append(MemberInfoRaw.Replace("\n", "<br/>"));
+                    }
+
                     if (Fname.HasValue())
+                    {
                         sb.AppendFormat("Father: {0}<br/>", Fname);
+                    }
+
                     if (Mname.HasValue())
+                    {
                         sb.AppendFormat("Mother: {0}<br/>", Mname);
+                    }
+
                     return sb.ToString();
                 }
             }

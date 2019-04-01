@@ -11,12 +11,12 @@ namespace CmsWeb.Models.iPhone
 {
     public class SearchResult0 : ActionResult
     {
-        private List<PeopleInfo> items;
-        private int count;
-        public SearchResult0(IEnumerable<PeopleInfo> items, int count)
+        private readonly List<PeopleInfo> items;
+        private readonly int count;
+        public SearchResult0(IQueryable<Person> items)
         {
-            this.items = items.ToList();
-            this.count = count;
+            this.items = SearchResult.PeopleList(items).ToList();
+            count = this.items.Count;
         }
         public override void ExecuteResult(ControllerContext context)
         {
@@ -40,7 +40,7 @@ namespace CmsWeb.Models.iPhone
                     w.WriteAttributeString("address", p.Address);
                     w.WriteAttributeString("citystatezip", p.CityStateZip);
                     w.WriteAttributeString("zip", p.Zip);
-                    w.WriteAttributeString("age", p.Age.ToString());
+                    w.WriteAttributeString("age", Person.AgeDisplay(p.Age, p.PeopleId).ToString());
                     w.WriteAttributeString("birthdate", p.BirthDate);
                     w.WriteAttributeString("homephone", p.HomePhone);
                     w.WriteAttributeString("cellphone", p.CellPhone);

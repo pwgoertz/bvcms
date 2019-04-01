@@ -1,4 +1,5 @@
 ﻿@using CmsData
+@using CmsData.Classes.RoleChecker
 @using CmsWeb.Areas.People.Models
 @using UtilityExtensions
 @model FamilyModel
@@ -6,7 +7,7 @@
     var showFamilyQueryLink = false;
     if (User.IsInRole("OrgLeadersOnly"))
     {
-        showFamilyQueryLink = !DbUtil.Db.Setting("UX-HideQueriesForOrgLeaders", false);
+        showFamilyQueryLink = !RoleChecker.HasSetting(SettingName.HideQueries, false);
     }
     else if (User.IsInRole("Access"))
     {
@@ -36,7 +37,7 @@
                 @foreach (var m in Model.ViewList())
                 {
                     var active = m.Id == Model.Person.PeopleId ? "active" : "";
-                    var ifdeceased = !active.HasValue() && m.IsDeceased == true ? "alert alert-danger" : "";
+                    var ifdeceased = !active.HasValue() && m.IsDeceased == true ? "alert-danger" : "";
                     var picdt = (m.PicDate ?? DateTime.Now);
                     var portraitUrl = $"/Portrait/{m.PortraitId}?v={picdt.Ticks}";
                     var portraitBgPos = m.PicXPos.HasValue || m.PicYPos.HasValue ? $"{m.PicXPos ?? 0}% {m.PicYPos ?? 0}%" : "top";
@@ -45,8 +46,11 @@
                             <div class="headshot" style="background-image:url(@portraitUrl); background-position: @portraitBgPos"></div>
                             <span class="name">@m.Name @Html.Raw(m.SpouseIndicator)</span><br />
                             <span class="meta">
-                                <span class="age">@m.Age</span>
-                                &bull; <span class="status">@m.MemberStatus</span>
+                                <span class="age">@m.AgeDisplay</span>
+                                @if (User.IsInRole("Access") || !DbUtil.Db.Setting("HideMyDataMemberBadge"))
+                                {
+                                    <text>&bull; <span class="status">@m.MemberStatus</span></text>
+                                }
                                 &bull; <span class="role">@m.PositionInFamily</span>
                             </span>
                             <div class="email email_display truncate">@m.Email</div>

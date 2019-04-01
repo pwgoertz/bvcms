@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mail;
 using System.Text.RegularExpressions;
@@ -11,6 +12,7 @@ namespace CmsData
     public partial class PythonModel
     {
         public bool TestEmail { get; set; }
+        public int MaxEmails { get; set; }
         public bool Transactional { get; set; }
 
         public bool SmtpDebug
@@ -132,8 +134,6 @@ namespace CmsData
             }
         }
 
-
-
         private void Email2(CMSDataContext db2, IQueryable<Person> q, int queuedBy, string fromAddr, string fromName, string subject,
             string body, string cclist = null, DateTime? dateWanted = null)
         {
@@ -143,6 +143,9 @@ namespace CmsData
                 where p.EmailAddress != ""
                 where (p.SendEmailAddress1 ?? true) || (p.SendEmailAddress2 ?? false)
                 select p;
+            if (MaxEmails > 0)
+                q = q.Take(MaxEmails);
+
             var tag = db2.PopulateSpecialTag(q, DbUtil.TagTypeId_Emailer);
 
             Util.IsInRoleEmailTest = TestEmail;
@@ -159,7 +162,6 @@ namespace CmsData
                 db2.SendPeopleEmail(emailqueue.Id);
             }
         }
-
         private void EmailContent2(object savedQuery, int queuedBy, string fromAddr, string fromName, string subject, string contentName, string cclist = null, DateTime? dateWanted = null)
         {
             var c = db.ContentOfTypeHtml(contentName);
@@ -172,5 +174,43 @@ namespace CmsData
             }
         }
 
+        public void EmailWithPythonData(object savedQuery, int queuedBy, string fromAddr, string fromName, string subject, string body, IEnumerable<dynamic> recipientData) 
+        {
+            using (var db2 = NewDataContext())
+            {
+                var q = db2.PeopleQuery2(savedQuery);
+                if (q == null)
+                    return;
+                IQueryable<Person> q1 = q;
+                var @from = new MailAddress(fromAddr, fromName);
+                q1 = from p in q1
+                    where p.EmailAddress != null
+                    where p.EmailAddress != ""
+                    where (p.SendEmailAddress1 ?? true) || (p.SendEmailAddress2 ?? false)
+                    select p;
+                if (MaxEmails > 0)
+                    q1 = q1.Take(MaxEmails);
+
+                var tag = db2.PopulateSpecialTag(q1, DbUtil.TagTypeId_Emailer);
+
+                Util.IsInRoleEmailTest = TestEmail;
+                var queueremail = db2.People.Where(pp => pp.PeopleId == queuedBy).Select(pp => pp.EmailAddress).SingleOrDefault();
+                if(!queueremail.HasValue())
+                    throw new Exception("QueuedBy PeopleId not found in model.Email");
+                Util.UserEmail = queueremail;
+                db2.SetCurrentOrgId(CurrentOrgId);
+
+                var emailqueue = db2.CreateQueue(queuedBy, @from, subject, body, null, tag.Id, false, cclist: null);
+                emailqueue.Transactional = Transactional;
+                db2.SendPeopleEmailWithPython(emailqueue.Id, recipientData, Data);
+            }
+        }
+        public void EmailContentWithPythonData(object savedQuery, int queuedBy, string fromAddr, string fromName, string contentName, IEnumerable<dynamic> recipientData)
+        {
+            var c = db.ContentOfTypeHtml(contentName);
+            if (c == null)
+                throw new Exception($"Cannot find content named \"{contentName.Truncate(50)}\"");
+            EmailWithPythonData(savedQuery, queuedBy, fromAddr, fromName, c.Title, c.Body, recipientData);
+        }
     }
 }

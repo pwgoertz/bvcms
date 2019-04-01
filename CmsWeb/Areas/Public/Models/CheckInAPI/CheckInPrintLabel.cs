@@ -30,9 +30,9 @@ namespace CmsWeb.CheckInAPI
                 // Members
                 member = orgMember.MemberTypeId != 310 && orgMember.MemberTypeId != 311;
 
-                if ((orgMember.MemberTypeId == 220 || orgMember.MemberTypeId == 230) && !org.NoSecurityLabel.Value)
+                if ((orgMember.MemberTypeId == 220 || orgMember.MemberTypeId == 230) && !(org.NoSecurityLabel ?? false))
                 {
-                    if (person.Age != null)
+                    if (person?.Age != null)
                     {
                         if (person.Age.Value < 18)
                         {
@@ -45,7 +45,7 @@ namespace CmsWeb.CheckInAPI
                     }
                     else
                     {
-                        if (person.FamilyPosition.Id == 30)
+                        if (person?.FamilyPosition.Id == 30)
                         {
                             requiresecuritylabel = true;
                         }
@@ -58,11 +58,11 @@ namespace CmsWeb.CheckInAPI
 
                 if (orgMember.MemberTypeId == 220 || orgMember.MemberTypeId == 230)
                 {
-                    labelCount = org.NumCheckInLabels ?? 1;
+                    labelCount = org?.NumCheckInLabels ?? 1;
                 }
                 else
                 {
-                    labelCount = org.NumWorkerCheckInLabels ?? 0;
+                    labelCount = org?.NumWorkerCheckInLabels ?? 0;
                 }
             }
             else
@@ -73,7 +73,7 @@ namespace CmsWeb.CheckInAPI
                 {
                     labelCount = org.NumCheckInLabels ?? 1;
 
-                    if (!org.NoSecurityLabel.Value)
+                    if (!(org.NoSecurityLabel ?? false))
                     {
                         requiresecuritylabel = true;
                     }

@@ -1,19 +1,27 @@
+using CmsData;
+using CmsData.Classes.RoleChecker;
+using CmsData.Codes;
+using CmsData.View;
+using CmsWeb.Code;
+using CmsWeb.Models;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.Linq;
+using System.Security.Principal;
 using System.Text.RegularExpressions;
 using System.Web;
-using CmsData;
-using CmsWeb.Models;
-using UtilityExtensions;
 using System.Web.Mvc;
-using CmsData.Codes;
-using CmsData.View;
+using UtilityExtensions;
 
 namespace CmsWeb.Areas.Org.Models
 {
-    public class OrgPeopleModel : PagedTableModel<OrgPerson, OrgPerson>, ICurrentOrg
+    public class OrgPeopleModel : PagedTableModel<OrgFilterPerson, OrgFilterPerson>
     {
+        public CMSDataContext Db { get; set; }
+        public Guid QueryId { get; set; }
+        public IPrincipal User { get; set; }
+
         public OrgPeopleModel()
             : base("Name", "asc", true)
         {
@@ -27,40 +35,43 @@ namespace CmsWeb.Areas.Org.Models
                 if (org == null)
                 {
                     if (Id == null)
-                        Id = DbUtil.Db.CurrentOrgId0;
-                    org = DbUtil.Db.LoadOrganizationById(Id);
+                    {
+                        Id = Db.CurrentSessionOrgId;
+                    }
+
+                    org = Db.LoadOrganizationById(Id);
                     CheckNameLinks();
                 }
                 return org;
             }
         }
 
-        public override IQueryable<OrgPerson> DefineModelList()
+        public override IQueryable<OrgFilterPerson> DefineModelList()
         {
-            var q = from p in DbUtil.Db.OrgPeople(Id, GroupSelect,
-                        this.First(), this.Last(), SgFilter, ShowHidden,
-                        Util2.CurrentTagName, Util2.CurrentTagOwnerId,
-                        FilterIndividuals, FilterTag, ShowMinistryInfo, Util.UserPeopleId)
+            var filter = Db.OrgFilter(QueryId);
+            filter.CopyPropertiesFrom(this);
+            filter.TagId = (int?)Db.TagCurrent().Id;
+            filter.LastUpdated = DateTime.Now;
+            Db.SubmitChanges();
+            var q = from p in Db.OrgFilterPeople(QueryId, ShowMinistryInfo)
                     select p;
             return q;
         }
 
         private Tag orgTag;
         public Tag OrgTag => orgTag ??
-                             (orgTag = DbUtil.Db.FetchOrCreateTag("Org-" + Id, Util.UserPeopleId, DbUtil.TagTypeId_OrgMembers));
+                             (orgTag = Db.FetchOrCreateTag(QueryId.ToString(), Util.UserPeopleId, DbUtil.TagTypeId_OrgMembers));
 
         private List<int> currentList;
 
         public List<int> CurrentList()
         {
             if (currentList != null)
+            {
                 return currentList;
-            return currentList = (from p in DbUtil.Db.OrgPeople(Id, GroupSelect,
-                        this.First(), this.Last(), SgFilter, ShowHidden,
-                        filterchecked: false, filtertag: FilterTag,
-                        currtag: Util2.CurrentTagName, currtagowner: Util2.CurrentTagOwnerId,
-                        ministryinfo: false, userpeopleid: Util.UserPeopleId)
-                                  select p.PeopleId.Value).ToList();
+            }
+
+            return currentList = DefineModelList().Select(vv => vv.PeopleId.Value).ToList();
         }
         public List<int> CurrentNotChecked()
         {
@@ -69,7 +80,7 @@ namespace CmsWeb.Areas.Org.Models
 
         public List<int> AllChecked()
         {
-            return OrgTag.People(DbUtil.Db).Select(pp => pp.PeopleId).ToList();
+            return OrgTag.People(Db).Select(pp => pp.PeopleId).ToList();
         }
         public List<int> CurrentChecked()
         {
@@ -79,11 +90,16 @@ namespace CmsWeb.Areas.Org.Models
         public Dictionary<int, string> NameLinks;
         private void CheckNameLinks()
         {
-            var ev = org.GetExtra(DbUtil.Db, "ShowNameLinks");
+            if (org == null)
+            {
+                return;
+            }
+
+            var ev = org.GetExtra(Db, "ShowNameLinks");
             if (ev.HasValue())
             {
-            	var namelinks = Regex.Replace(ev, 
-                    @"\[(?<text>.*?)\]\((?<url>[^\s]*)\s*(?<attr>.*?)\)", 
+                var namelinks = Regex.Replace(ev,
+                    @"\[(?<text>.*?)\]\((?<url>[^\s]*)\s*(?<attr>.*?)\)",
                     "<a href=\"${url}\" ${attr}>${text}</a>");
                 NameLinks = (
                     from pid in CurrentList()
@@ -98,9 +114,10 @@ namespace CmsWeb.Areas.Org.Models
         }
 
 
-        public override IQueryable<OrgPerson> DefineModelSort(IQueryable<OrgPerson> q)
+        public override IQueryable<OrgFilterPerson> DefineModelSort(IQueryable<OrgFilterPerson> q)
         {
             if (Direction == "asc")
+            {
                 switch (Sort)
                 {
                     case "Name":
@@ -158,7 +175,9 @@ namespace CmsWeb.Areas.Org.Models
                         q = from p in q orderby p.IsChecked, p.Name2 select p;
                         break;
                 }
+            }
             else
+            {
                 switch (Sort)
                 {
                     case "Church":
@@ -216,17 +235,19 @@ namespace CmsWeb.Areas.Org.Models
                         q = from p in q orderby p.IsChecked descending, p.Name2 descending select p;
                         break;
                 }
+            }
+
             return q;
         }
 
-        public override IEnumerable<OrgPerson> DefineViewList(IQueryable<OrgPerson> q)
+        public override IEnumerable<OrgFilterPerson> DefineViewList(IQueryable<OrgFilterPerson> q)
         {
             return q;
         }
 
         public IEnumerable<SelectListItem> SmallGroups()
         {
-            return from mt in DbUtil.Db.MemberTags
+            return from mt in Db.MemberTags
                    where mt.OrgId == Id
                    orderby mt.Name
                    select new SelectListItem
@@ -242,13 +263,25 @@ namespace CmsWeb.Areas.Org.Models
             {
                 var values = new List<string>();
                 if (MultiSelect)
+                {
                     values.Add("Multi");
+                }
+
                 if (ShowHidden)
+                {
                     values.Add("Hidden");
+                }
+
                 if (ShowMinistryInfo)
+                {
                     values.Add("Ministry");
+                }
+
                 if (values.Count == 0)
+                {
                     values.Add("Options");
+                }
+
                 return string.Join(",", values);
             }
         }
@@ -277,20 +310,27 @@ namespace CmsWeb.Areas.Org.Models
         public string ShowAddressActive => ShowAddress ? "active" : "";
         public string FilterTagActive => FilterTag ? "active" : "";
         public string FilterIndActive => FilterIndividuals ? "active" : "";
-        public bool ShowPeopleLink => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-DisablePersonLinksForOrgLeaders");
-        public bool OrgLeaderAddDrop => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-OrgLeadersOnlyOrgMembersDropAdd");
-        public bool HideInactiveButton => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-HideInactiveOrgMembersForOrgLeadersOnly");
-        public bool HidePendingButton => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-HidePendingOrgMembersForOrgLeadersOnly");
-        public bool HideGuestsButton => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-HideGuestsOrgMembersForOrgLeadersOnly");
-        public bool HideOptionsButton => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-OrgLeaderLimitedSearchPerson");
-        public bool HideFilterOptions => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-OrgLeaderLimitedSearchPerson");
 
+        private bool? orgLeaderAddDrop;
+        public bool OrgLeaderAddDrop => orgLeaderAddDrop ?? (bool)(orgLeaderAddDrop = RoleChecker.HasSetting(SettingName.OrgMembersDropAdd, false));
+        public bool DisablePeopleLink => RoleChecker.HasSetting(SettingName.DisablePersonLinks, false);
+        public bool HideInactiveButton => RoleChecker.HasSetting(SettingName.HideInactiveOrgMembers, false);
+        public bool HidePendingButton => RoleChecker.HasSetting(SettingName.HidePendingOrgMembers, false);
+        public bool HideGuestsButton => RoleChecker.HasSetting(SettingName.HideGuestsOrgMembers, false);
+        public bool HidePreviousButton => RoleChecker.HasSetting(SettingName.HidePreviousOrgMembers, false);
+
+        public bool ShowOptions => RoleChecker.HasSetting(SettingName.Organization_ShowOptionsMenu, true);
+        public bool ShowSubgroupFilters => RoleChecker.HasSetting(SettingName.Organization_ShowFiltersBar, true);
+        public bool ShowBirthday => RoleChecker.HasSetting(SettingName.Organization_ShowBirthday, true);
+        public bool ShowTagButtons => RoleChecker.HasSetting(SettingName.Organization_ShowTagButtons, true);
+        public bool ShowShowAddress => RoleChecker.HasSetting(SettingName.Organization_ShowAddress, true);
+
+        public bool ShowAddress { get; set; }
         public int? Id { get; set; }
         public string GroupSelect { get; set; }
         public string NameFilter { get; set; }
         public string SgFilter { get; set; }
         public bool ShowHidden { get; set; }
-        public bool ShowAddress { get; set; }
         public bool FilterTag { get; set; }
         public bool FilterIndividuals { get; set; }
         public bool ClearFilter { get; set; }
@@ -331,8 +371,7 @@ to `Add`, `Drop`, `Update` Members etc.
                 case GroupSelectCode.Guest:
                     return false;
                 case GroupSelectCode.Previous:
-                    var u = HttpContext.Current.User;
-                    return u.IsInRole("Developer") || u.IsInRole("Conversion");
+                    return User.IsInRole("Developer") || User.IsInRole("Conversion");
                 default:
                     return true;
             }
@@ -340,11 +379,14 @@ to `Add`, `Drop`, `Update` Members etc.
 
         public bool Showdrop(string group)
         {
-            var u = HttpContext.Current.User;
-            var orgLeader = u.IsInRole("OrgLeadersOnly");
+            if ((MultiSelect ? "" : GroupSelect) != group)
+            {
+                return false;
+            }
 
-            return (u.IsInRole("Edit") || (orgLeader && DbUtil.Db.Setting("UX-OrgLeadersOnlyOrgMembersDropAdd"))) &&
-                (MultiSelect ? "" : GroupSelect) == group;
+            var u = HttpContextFactory.Current.User;
+            return u.IsInRole("Edit")
+                || RoleChecker.HasSetting(SettingName.OrgMembersDropAdd, false);
         }
     }
 }

@@ -2,6 +2,8 @@
 using System.Linq;
 using System.Web;
 using System.Xml.Serialization;
+using CmsData.Classes.ExtraValues;
+using CmsData.Classes.RoleChecker;
 using UtilityExtensions;
 
 namespace CmsData.ExtraValue
@@ -16,7 +18,7 @@ namespace CmsData.ExtraValue
         [XmlAttribute] public string Link { get; set; }
 
         [XmlElement("Code")]
-        public List<string> Codes { get; set; }
+        public List<Code> Codes { get; set; }
 
 
         [XmlIgnore] public int Order;
@@ -30,7 +32,7 @@ namespace CmsData.ExtraValue
             if (!VisibilityRoles.HasValue())
                 return true;
             var a = VisibilityRoles.SplitStr(",");
-            var user = HttpContext.Current?.User;
+            var user = HttpContextFactory.Current?.User;
             if (user == null)
                 return true;
             return a.Any(role => user.IsInRole(role.Trim()));
@@ -38,17 +40,19 @@ namespace CmsData.ExtraValue
 
         public bool UserCanEdit()
         {
-            var user = HttpContext.Current?.User;
+            if (Type == "Attr")
+                return false;
+            var user = HttpContextFactory.Current?.User;
             if (user == null)
                 return false;
 
-            var path = HttpContext.Current?.Request.Path;
+            var path = HttpContextFactory.Current?.Request.Path;
             if (path != null && path.Contains("CommunityGroup"))
             {
                 if (user.IsInRole("Edit"))
                     return true;
 
-                if (user.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-OrgLeadersOnlyCanEditCGInfoEVs"))
+                if (RoleChecker.HasSetting(SettingName.CanEditCGInfoEVs, false))
                 {
                     if (string.IsNullOrEmpty(EditableRoles))
                         return true;

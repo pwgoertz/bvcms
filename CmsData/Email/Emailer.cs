@@ -13,18 +13,16 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Net;
-using System.Net.Http;
 using System.Net.Mime;
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
-using System.Transactions;
 using System.Web;
+using CmsData.API;
 using Elmah;
 using HtmlAgilityPack;
+using SendGrid;
 using SendGrid.Helpers.Mail;
-using TTask = System.Threading.Tasks.Task;
 using MContent = SendGrid.Helpers.Mail.Content;
 
 namespace CmsData
@@ -69,7 +67,7 @@ namespace CmsData
         {
             var emailqueue = new EmailQueue
             {
-                Queued = DateTime.Now,
+                Queued = Util.Now,
                 FromAddr = fromaddress.Address,
                 FromName = fromaddress.DisplayName,
                 Subject = subject,
@@ -85,7 +83,7 @@ namespace CmsData
             emailqueue.EmailQueueTos.Add(new EmailQueueTo
             {
                 PeopleId = p.PeopleId,
-                OrgId = CurrentOrgId,
+                OrgId = Util2.CurrentOrgId,
                 AddEmail = addmailstr,
                 Guid = Guid.NewGuid(),
             });
@@ -97,7 +95,7 @@ namespace CmsData
         {
             var emailqueue = new EmailQueue
             {
-                Queued = DateTime.Now,
+                Queued = Util.Now,
                 FromAddr = fromAddress.Address,
                 FromName = fromAddress.DisplayName,
                 Subject = subject,
@@ -113,7 +111,7 @@ namespace CmsData
             emailqueue.EmailQueueTos.Add(new EmailQueueTo
             {
                 PeopleId = p.PeopleId,
-                OrgId = CurrentOrgId,
+                OrgId = Util2.CurrentOrgId,
                 AddEmail = addmailstr,
                 Guid = Guid.NewGuid(),
             });
@@ -162,8 +160,18 @@ namespace CmsData
         {
             var list = (from p in CMSRoleProvider.provider.GetAdmins()
                         where p.EmailAddress.HasValue()
-                              && !p.EmailAddress.Contains("bvcms.com")
                               && !p.EmailAddress.Contains("touchpointsoftware.com")
+                        select p).ToList();
+            if (list.Count == 0)
+                list = (from p in CMSRoleProvider.provider.GetAdmins()
+                        where p.EmailAddress.HasValue()
+                        select p).ToList();
+            return list;
+        }
+        public List<Person> AdminPeople2()
+        {
+            var list = (from p in CMSRoleProvider.provider.GetAdmins()
+                        where p.EmailAddress.HasValue()
                         select p).ToList();
             if (list.Count == 0)
                 list = (from p in CMSRoleProvider.provider.GetAdmins()
@@ -214,7 +222,7 @@ namespace CmsData
                      where p.PeopleId == a[0]
                      select p.FromEmail;
             if (!q2.Any())
-                return Setting("AdminMail", "info@touchpointsoftware.com");
+                return Setting("AdminMail", ConfigurationManager.AppSettings["supportemail"]);
             return q2.SingleOrDefault();
         }
 
@@ -230,7 +238,7 @@ namespace CmsData
                      where p.PeopleId == a[0]
                      select Util.TryGetMailAddress(p.FromEmail);
             if (!q2.Any())
-                return Util.ToMailAddressList(Setting("AdminMail", "info@touchpointsoftware.com"));
+                return Util.ToMailAddressList(Setting("AdminMail", ConfigurationManager.AppSettings["supportemail"]));
             return q2.ToList();
         }
 
@@ -297,7 +305,7 @@ namespace CmsData
         {
             var emailqueue = new EmailQueue
             {
-                Queued = DateTime.Now,
+                Queued = Util.Now,
                 FromAddr = from.Address,
                 FromName = from.DisplayName,
                 Subject = subject,
@@ -328,80 +336,79 @@ namespace CmsData
             if (tag == null)
                 return null;
 
-            using (var tran = new TransactionScope(TransactionScopeOption.Required, TimeSpan.FromSeconds(1200)))
+            var emailqueue = new EmailQueue
             {
-                var emailqueue = new EmailQueue
-                {
-                    Queued = DateTime.Now,
-                    FromAddr = from.Address,
-                    FromName = from.DisplayName,
-                    Subject = subject,
-                    Body = body,
-                    SendWhen = schedule,
-                    QueuedBy = queuedBy,
-                    Transactional = false,
-                    PublicX = publicViewable,
-                    CCParents = ccParents,
-                    CClist = cclist
-                };
-                EmailQueues.InsertOnSubmit(emailqueue);
-                SubmitChanges();
+                Queued = Util.Now,
+                FromAddr = from.Address,
+                FromName = from.DisplayName,
+                Subject = subject,
+                Body = body,
+                SendWhen = schedule,
+                QueuedBy = queuedBy,
+                Transactional = false,
+                PublicX = publicViewable,
+                CCParents = ccParents,
+                CClist = cclist,
+                Testing = Util.IsInRoleEmailTest,
+                ReadyToSend = false, // wait until all individual emailqueueto records are created.
+            };
+            EmailQueues.InsertOnSubmit(emailqueue);
+            SubmitChanges();
 
-                if (body.Contains("http://publiclink", ignoreCase: true))
-                {
-                    var link = ServerLink("/EmailView/" + emailqueue.Id);
-                    var re = new Regex("http://publiclink",
-                        RegexOptions.Singleline | RegexOptions.Multiline | RegexOptions.IgnoreCase);
-                    emailqueue.Body = re.Replace(body, link);
-                }
-
-                var q = tag.People(this);
-
-                IQueryable<int> q2 = null;
-                if (emailqueue.CCParents == true)
-                    q2 = from p in q.Distinct()
-                         where (p.EmailAddress ?? "") != ""
-                               || (p.Family.HeadOfHousehold.EmailAddress ?? "") != ""
-                               || (p.Family.HeadOfHouseholdSpouse.EmailAddress ?? "") != ""
-                         where (p.SendEmailAddress1 ?? true)
-                               || (p.SendEmailAddress2 ?? false)
-                               || (p.Family.HeadOfHousehold.SendEmailAddress1 ?? false)
-                               || (p.Family.HeadOfHousehold.SendEmailAddress2 ?? false)
-                               || (p.Family.HeadOfHouseholdSpouse.SendEmailAddress1 ?? false)
-                               || (p.Family.HeadOfHouseholdSpouse.SendEmailAddress2 ?? false)
-                         where p.EmailOptOuts.All(oo => oo.FromEmail != emailqueue.FromAddr)
-                         orderby p.PeopleId
-                         select p.PeopleId;
-                else
-                    q2 = from p in q.Distinct()
-                         where p.EmailAddress != null
-                         where p.EmailAddress != ""
-                         where (p.SendEmailAddress1 ?? true) || (p.SendEmailAddress2 ?? false)
-                         where p.EmailOptOuts.All(oo => oo.FromEmail != emailqueue.FromAddr)
-                         orderby p.PeopleId
-                         select p.PeopleId;
-
-                foreach (var pid in q2)
-                {
-                    emailqueue.EmailQueueTos.Add(new EmailQueueTo
-                    {
-                        PeopleId = pid,
-                        OrgId = CurrentOrgId,
-                        Guid = Guid.NewGuid(),
-                        GoerSupportId = goerSupporterId,
-                    });
-                }
-                SubmitChanges();
-                tran.Complete();
-                return emailqueue;
+            if (body.Contains("http://publiclink", ignoreCase: true))
+            {
+                var link = ServerLink("/EmailView/" + emailqueue.Id);
+                var re = new Regex("http://publiclink",
+                    RegexOptions.Singleline | RegexOptions.Multiline | RegexOptions.IgnoreCase);
+                emailqueue.Body = re.Replace(body, link);
             }
+
+            var q = tag.People(this);
+
+            IQueryable<int> q2 = null;
+            if (emailqueue.CCParents == true)
+                q2 = from p in q.Distinct()
+                     where (p.EmailAddress ?? "") != ""
+                           || (p.Family.HeadOfHousehold.EmailAddress ?? "") != ""
+                           || (p.Family.HeadOfHouseholdSpouse.EmailAddress ?? "") != ""
+                     where (p.SendEmailAddress1 ?? true)
+                           || (p.SendEmailAddress2 ?? false)
+                           || (p.Family.HeadOfHousehold.SendEmailAddress1 ?? false)
+                           || (p.Family.HeadOfHousehold.SendEmailAddress2 ?? false)
+                           || (p.Family.HeadOfHouseholdSpouse.SendEmailAddress1 ?? false)
+                           || (p.Family.HeadOfHouseholdSpouse.SendEmailAddress2 ?? false)
+                     where p.EmailOptOuts.All(oo => oo.FromEmail != emailqueue.FromAddr)
+                     orderby p.PeopleId
+                     select p.PeopleId;
+            else
+                q2 = from p in q.Distinct()
+                     where p.EmailAddress != null
+                     where p.EmailAddress != ""
+                     where (p.SendEmailAddress1 ?? true) || (p.SendEmailAddress2 ?? false)
+                     where p.EmailOptOuts.All(oo => oo.FromEmail != emailqueue.FromAddr)
+                     orderby p.PeopleId
+                     select p.PeopleId;
+
+            foreach (var pid in q2)
+            {
+                emailqueue.EmailQueueTos.Add(new EmailQueueTo
+                {
+                    PeopleId = pid,
+                    OrgId = Util2.CurrentOrgId,
+                    Guid = Guid.NewGuid(),
+                    GoerSupportId = goerSupporterId,
+                });
+            }
+            emailqueue.ReadyToSend = true;
+            SubmitChanges();
+            return emailqueue;
         }
 
         public EmailQueue CreateQueueForSupporters(int? queuedBy, MailAddress from, string subject, string body, DateTime? schedule, List<GoerSupporter> list, bool publicViewable)
         {
             var emailqueue = new EmailQueue
             {
-                Queued = DateTime.Now,
+                Queued = Util.Now,
                 FromAddr = from.Address,
                 FromName = from.DisplayName,
                 Subject = subject,
@@ -428,7 +435,7 @@ namespace CmsData
                 emailqueue.EmailQueueTos.Add(new EmailQueueTo
                 {
                     PeopleId = g.SupporterId ?? 0,
-                    OrgId = CurrentOrgId,
+                    OrgId = Util2.CurrentOrgId,
                     Guid = Guid.NewGuid(),
                     GoerSupportId = g.Id,
                 });
@@ -463,8 +470,8 @@ namespace CmsData
                             $"<p style='color:red'>You are receiving this because there is no email address for {p.Name}({p.PeopleId}). You should probably contact them since they were probably expecting this information.</p>\n{text}",
                             Util.ToMailAddressList(from),
                             emailqueueto);
-                    emailqueueto.Sent = DateTime.Now;
-                    emailqueue.Sent = DateTime.Now;
+                    emailqueueto.Sent = Util.Now;
+                    emailqueue.Sent = Util.Now;
                     if (emailqueue.Redacted ?? false)
                         emailqueue.Body = "redacted";
                     SubmitChanges();
@@ -485,17 +492,18 @@ namespace CmsData
             var aa = new List<MailAddress>();
             if (p == null)
                 return aa;
-            if (p.SendEmailAddress1 ?? true)
+            if ((p.SendEmailAddress1 ?? true) && Util.ValidEmail(p.EmailAddress))
                 Util.AddGoodAddress(aa, p.FromEmail);
-            if (p.SendEmailAddress2 ?? false)
+            if ((p.SendEmailAddress2 ?? false) && Util.ValidEmail(p.EmailAddress2))
                 Util.AddGoodAddress(aa, p.FromEmail2);
             if (regemail.HasValue())
                 foreach (var ad in regemail.SplitStr(",;"))
-                    Util.AddGoodAddress(aa, ad);
+                    if(Util.ValidEmail(ad))
+                        Util.AddGoodAddress(aa, ad);
             return aa;
         }
 
-        public void SendPeopleEmail(int queueid)
+        public void SendPeopleEmail(int queueid, bool onlyProspects = false)
         {
             var emailqueue = EmailQueues.Single(ee => ee.Id == queueid);
             var from = Util.FirstAddress(emailqueue.FromAddr, emailqueue.FromName);
@@ -510,37 +518,40 @@ namespace CmsData
 
             var body = DoClickTracking(emailqueue);
             var m = new EmailReplacements(this, body, from, queueid);
-            emailqueue.Started = DateTime.Now;
+            emailqueue.Started = Util.Now;
             SubmitChanges();
 
             var cc = Util.ToMailAddressList(emailqueue.CClist);
 
             if (emailqueue.SendFromOrgId.HasValue)
             {
-                var q2 = from om in OrganizationMembers
-                         where om.OrganizationId == emailqueue.SendFromOrgId
-                         where om.MemberTypeId != MemberTypeCode.InActive
-                         where om.MemberTypeId != MemberTypeCode.Prospect
-                         where (om.Pending ?? false) == false
-                         let p = om.Person
-                         where p.EmailAddress != null
-                         where p.EmailAddress != ""
-                         where (p.SendEmailAddress1 ?? true) || (p.SendEmailAddress2 ?? false)
-                         where p.EmailOptOuts.All(oo => oo.FromEmail != emailqueue.FromAddr)
-                         select om.PeopleId;
-                foreach (var pid in q2)
+                if (!onlyProspects)
                 {
-                    // Protect against duplicate PeopleIDs ending up in the queue
-                    if (emailqueue.EmailQueueTos.Any(pp => pp.PeopleId == pid))
-                        continue;
-                    emailqueue.EmailQueueTos.Add(new EmailQueueTo
+                    var q2 = from om in OrganizationMembers
+                             where om.OrganizationId == emailqueue.SendFromOrgId
+                             where om.MemberTypeId != MemberTypeCode.InActive
+                             where om.MemberTypeId != MemberTypeCode.Prospect
+                             where (om.Pending ?? false) == false
+                             let p = om.Person
+                             where p.EmailAddress != null
+                             where p.EmailAddress != ""
+                             where (p.SendEmailAddress1 ?? true) || (p.SendEmailAddress2 ?? false)
+                             where p.EmailOptOuts.All(oo => oo.FromEmail != emailqueue.FromAddr)
+                             select om.PeopleId;
+                    foreach (var pid in q2)
                     {
-                        PeopleId = pid,
-                        OrgId = emailqueue.SendFromOrgId,
-                        Guid = Guid.NewGuid(),
-                    });
+                        // Protect against duplicate PeopleIDs ending up in the queue
+                        if (emailqueue.EmailQueueTos.Any(pp => pp.PeopleId == pid))
+                            continue;
+                        emailqueue.EmailQueueTos.Add(new EmailQueueTo
+                        {
+                            PeopleId = pid,
+                            OrgId = emailqueue.SendFromOrgId,
+                            Guid = Guid.NewGuid(),
+                        });
+                    }
+                    SubmitChanges();
                 }
-                SubmitChanges();
             }
 
             var q = from to in EmailQueueTos
@@ -560,7 +571,7 @@ namespace CmsData
                     if (Setting("sendemail", "true") != "false")
                     {
                         SendEmail(from, emailqueue.Subject, text, aa, to, cc);
-                        to.Sent = DateTime.Now;
+                        to.Sent = Util.Now;
                         SubmitChanges();
                     }
                 }
@@ -568,7 +579,7 @@ namespace CmsData
                 {
                     var subject = $"sent emails - error:(emailid={emailqueue.Id}) {CmsHost}";
                     ErrorLog.GetDefault(null).Log(new Error(new Exception(subject, ex)));
-                    SendEmail(from, subject, ex.Message, Util.ToMailAddressList(from), to);
+                    SendEmail(from, subject, $"{ex.Message}\n{ex.StackTrace}", Util.ToMailAddressList(from), to);
                 }
             }
 
@@ -581,7 +592,7 @@ namespace CmsData
                     {
                         if (Setting("sendemail", "true") != "false")
                         {
-                            List<MailAddress> mal = new List<MailAddress> {ma};
+                            List<MailAddress> mal = new List<MailAddress> { ma };
                             SendEmail(from, emailqueue.Subject, body, mal, emailqueue.Id, cc: cc);
                         }
                     }
@@ -594,7 +605,7 @@ namespace CmsData
                 }
             }
 
-            emailqueue.Sent = DateTime.Now;
+            emailqueue.Sent = Util.Now;
             if (emailqueue.Redacted ?? false)
                 emailqueue.Body = "redacted";
             else if (emailqueue.Transactional == false)
@@ -611,6 +622,77 @@ namespace CmsData
             SubmitChanges();
         }
 
+        public void SendPeopleEmailWithPython(int queueid, IEnumerable<dynamic> recipientData, DynamicData pythonData)
+        {
+            var emailqueue = EmailQueues.Single(ee => ee.Id == queueid);
+            var from = Util.FirstAddress(emailqueue.FromAddr, emailqueue.FromName);
+            if (!emailqueue.Subject.HasValue() || !emailqueue.Body.HasValue())
+            {
+                SendEmail(from,
+                    $"sent emails - error(emailid={emailqueue.Id})", "no subject or body, no emails sent",
+                    Util.ToMailAddressList(from),
+                    emailqueue.Id);
+                return;
+            }
+            var dict = recipientData.ToDictionary(vv => (int)vv.PeopleId, vv => vv);
+
+            var body = DoClickTracking(emailqueue);
+            var m = new EmailReplacements(this, body, from, queueid, pythondata: pythonData);
+            emailqueue.Started = Util.Now;
+            SubmitChanges();
+
+            var cc = Util.ToMailAddressList(emailqueue.CClist);
+
+            var q = from to in EmailQueueTos
+                    where to.Id == emailqueue.Id
+                    where to.Sent == null
+                    orderby to.PeopleId
+                    select to;
+            foreach (var to in q)
+            {
+                try
+                {
+                    if (m.OptOuts != null && m.OptOuts.Any(vv => vv.PeopleId == to.PeopleId && vv.OptOutX == true))
+                        continue;
+                    if (!dict.ContainsKey(to.PeopleId))
+                        continue;
+
+                    var text = m.DoReplacements(to.PeopleId, to);
+
+                    text = RenderTemplate(text, dict[to.PeopleId]);
+                    if(text.Contains("<!--SKIP-->"))
+                        continue;
+                    var re = new Regex("<!--SUBJECT:(?<subj>.*)-->");
+                	var subj = re.Match(text).Groups["subj"].Value;
+
+                    var aa = m.ListAddresses;
+
+                    if (Setting("sendemail", "true") != "false")
+                    {
+                        SendEmail(from, Util.PickFirst(subj, emailqueue.Subject), text, aa, to, cc);
+                        to.Sent = Util.Now;
+                        SubmitChanges();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var subject = $"sent emails - error:(emailid={emailqueue.Id}) {CmsHost}";
+                    ErrorLog.GetDefault(null).Log(new Error(new Exception(subject, ex)));
+                    SendEmail(from, subject, $"{ex.Message}\n{ex.StackTrace}", Util.ToMailAddressList(from), to);
+                }
+            }
+
+            emailqueue.Sent = Util.Now;
+            var nitems = emailqueue.EmailQueueTos.Count();
+            if (cc.Count > 0)
+            {
+                nitems += cc.Count;
+            }
+            if (nitems > 1)
+                NotifySentEmails(from.Address, from.DisplayName,
+                    emailqueue.Subject, nitems, emailqueue.Id);
+            SubmitChanges();
+        }
         private string DoClickTracking(EmailQueue emailqueue)
         {
             var body = emailqueue.Body;
@@ -631,10 +713,11 @@ namespace CmsData
             string subj = "sent emails: " + subject;
             var link = ServerLink("/Emails/Details/" + id);
             string body = $@"<a href=""{link}"">{count} emails sent</a>";
-
-            if(Util.IsMyDataUser == false)
+#if DEBUG
+#else
+            if (Util.IsMyDataUser == false)
                 SendEmail(from, subj, body, Util.ToMailAddressList(from), id);
-            SendEmail(from, Host + " " + subj, body, Util.SendErrorsTo(), id);
+#endif
         }
 
         private string CreateClickTracking(int emailId, string input)
@@ -652,17 +735,22 @@ namespace CmsData
                 foreach (HtmlNode link in linkList)
                 {
                     var att = link.Attributes["href"];
-                    if (EmailReplacements.IsSpecialLink(att.Value))
+                    var url = att.Value;
+                    if (EmailReplacements.IsSpecialLink(url))
+                        continue;
+                    if (url.StartsWith("mailto:"))
                         continue;
 
-                    var hash = HashMd5Base64(md5Hash, att.Value + DateTime.Now.ToString("o") + linkIndex);
+                    if (EmailReplacements.SettingUrlRe.IsMatch(url))
+                        url = EmailReplacements.SettingUrlReplacement(this, url);
+                    var hash = HashMd5Base64(md5Hash, url + DateTime.Now.ToString("o") + linkIndex);
 
                     var emailLink = new EmailLink
                     {
                         Created = DateTime.Now,
                         EmailID = emailId,
                         Hash = hash,
-                        Link = att.Value
+                        Link = url
                     };
                     EmailLinks.InsertOnSubmit(emailLink);
                     SubmitChanges();
@@ -670,10 +758,6 @@ namespace CmsData
                     att.Value = ServerLink($"/ExternalServices/ct?l={HttpUtility.UrlEncode(hash)}");
 
                     linkIndex++;
-
-                    //System.Diagnostics.Debug.WriteLine(att.Value);
-                    //System.Diagnostics.Debug.WriteLine("Unhashed: " + att.Value + DateTime.Now.ToString("o"));
-                    //System.Diagnostics.Debug.WriteLine("Hashed: " + hashMD5Base64( md5Hash, att.Value + DateTime.Now.ToString("o") ) );
                 }
             }
 
@@ -690,11 +774,11 @@ namespace CmsData
         public string CustomSendGridApiKey => Setting("SendGridAPIKey", "");
         public bool UseSendGridApi => Setting("UseSendGridApi");
         public bool UseIpWarmup => Setting("UseIpWarmup");
-        public string CustomFromDomain => Setting("SysFromEmail", "");
+        public string CustomFromDomain => Setting("sysfromemail", ConfigurationManager.AppSettings["sysfromemail"]);
 
         // Configuration for SendGrid
         public string DefaultSendGridApiKey => ConfigurationManager.AppSettings["SendGridAPIKey"];
-        public string DefaultFromDomain => Util.PickFirst(ConfigurationManager.AppSettings["sysfromemail"], "mailer@bvcms.com");
+        public string DefaultFromDomain => ConfigurationManager.AppSettings["sysfromemail"];
 
         public bool CanUseSendGrid => CustomSendGridApiKey.HasValue() && DefaultSendGridApiKey.HasValue();
         public bool UseCustomEmailDomain => CustomSendGridApiKey.HasValue() && CustomFromDomain.HasValue();
@@ -704,6 +788,11 @@ namespace CmsData
         {
             var domain = SendEmail(fromAddress, subject, message, to, eqto.Id, eqto.PeopleId, cc);
             eqto.DomainFrom = domain;
+        }
+
+        public string SendEmail(MailAddress fromAddress, string subject, string message, MailAddress to, int? id = null, int? pid = null, List<MailAddress> cc = null)
+        {
+            return SendEmail(fromAddress, subject, message, new[] { to }.ToList(), id, pid, cc);
         }
 
         public string SendEmail(MailAddress fromAddress, string subject, string message, List<MailAddress> to, int? id = null, int? pid = null, List<MailAddress> cc = null)
@@ -734,60 +823,53 @@ namespace CmsData
                 fromDomain = DefaultFromDomain;
                 apiKey = DefaultSendGridApiKey;
             }
+            var client = new SendGridClient(apiKey);
 
             if (from == null)
                 from = Util.FirstAddress(senderrorsto);
 
-            var mail = new Mail
+            var mail = new SendGridMessage()
             {
-                From = new Email(fromDomain, from.DisplayName),
+                From = new EmailAddress(fromDomain, from.DisplayName),
                 Subject = subject,
-                ReplyTo = new Email(from.Address, from.DisplayName)
+                ReplyTo = new EmailAddress(from.Address, from.DisplayName),
+                PlainTextContent = "Hello, Email from the helper [SendSingleEmailAsync]!",
+                HtmlContent = "<strong>Hello, Email from the helper! [SendSingleEmailAsync]</strong>"
             };
             var pe = new Personalization();
             foreach (var ma in to)
                 if (ma.Host != "nowhere.name" || Util.IsInRoleEmailTest)
-                    pe.AddTo(new Email(ma.Address, ma.DisplayName));
+                    mail.AddTo(new EmailAddress(ma.Address, ma.DisplayName));
 
             if (cc?.Count > 0)
             {
                 string cclist = string.Join(",", cc);
                 if (!cc.Any(vv => vv.Address.Equal(from.Address)))
                     cclist = $"{from.Address},{cclist}";
-                mail.ReplyTo = new Email(cclist);
+                mail.ReplyTo = new EmailAddress(cclist);
             }
 
-            pe.AddHeader(XSmtpApi, XSmtpApiHeader(id, pid, fromDomain));
-            pe.AddHeader(XBvcms, XBvcmsHeader(id, pid));
+            pe.Headers.Add(XSmtpApi, XSmtpApiHeader(id, pid, fromDomain));
+            pe.Headers.Add(XBvcms, XBvcmsHeader(id, pid));
 
-            mail.AddPersonalization(pe);
+            mail.Personalizations.Add(pe);
 
-            if (pe.Tos.Count == 0 && pe.Tos.Any(tt => tt.Address.EndsWith("@nowhere.name")))
+            if (pe.Tos.Count == 0 && pe.Tos.Any(tt => tt.Email.EndsWith("@nowhere.name")))
                 return null;
             var badEmailLink = "";
             if (pe.Tos.Count == 0)
             {
-                pe.AddTo(new Email(from.Address, from.DisplayName));
-                pe.AddTo(new Email(Util.FirstAddress(senderrorsto).Address));
+                pe.Tos.Add(new EmailAddress(from.Address, from.DisplayName));
+                pe.Tos.Add(new EmailAddress(Util.FirstAddress(senderrorsto).Address));
                 mail.Subject += $"-- bad addr for {CmsHost}({pid})";
                 badEmailLink = $"<p><a href='{CmsHost}/Person2/{pid}'>bad addr for</a></p>\n";
             }
 
             var regex = new Regex("</?([^>]*)>", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-            var text = regex.Replace(message, string.Empty);
-            var html = badEmailLink + message + CcMessage(cc);
+            mail.PlainTextContent = regex.Replace(message, string.Empty);
+            mail.HtmlContent = badEmailLink + message + CcMessage(cc);
 
-            mail.AddContent(new MContent("text/plain", text));
-            mail.AddContent(new MContent("text/html", html));
-
-            var reqBody = mail.Get();
-
-            using (var wc = new WebClient())
-            {
-                wc.Headers.Add("Authorization", $"Bearer {apiKey}");
-                wc.Headers.Add("Content-Type", "application/json");
-                wc.UploadString("https://api.sendgrid.com/v3/mail/send", reqBody);
-            }
+            var response = client.SendEmailAsync(mail);
             return fromDomain;
         }
 
@@ -810,7 +892,7 @@ namespace CmsData
             }
 
             msg.Headers.Add(XSmtpApi, XSmtpApiHeader(id, pid, fromDomain));
-            msg.Headers.Add(XBvcms,  XBvcmsHeader(id, pid));
+            msg.Headers.Add(XBvcms, XBvcmsHeader(id, pid));
 
             foreach (var ma in to)
                 if (ma.Host != "nowhere.name" || Util.IsInRoleEmailTest)

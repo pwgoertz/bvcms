@@ -22,7 +22,7 @@ namespace CmsWeb.Models.ExtraValues
         public ExtraValue(PeopleExtra v, ExtraValueModel model)
         {
             Type = v.Type;
-            Field = v.Field;
+            Field = v.Field.Trim();
             StrValue = v.StrValue;
             DateValue = v.DateValue;
             Data = v.Data;
@@ -34,7 +34,7 @@ namespace CmsWeb.Models.ExtraValues
         public ExtraValue(FamilyExtra v, ExtraValueModel model)
         {
             Type = v.Type;
-            Field = v.Field;
+            Field = v.Field.Trim();
             StrValue = v.StrValue;
             DateValue = v.DateValue;
             Data = v.Data;
@@ -46,7 +46,7 @@ namespace CmsWeb.Models.ExtraValues
         public ExtraValue(OrganizationExtra v, ExtraValueModel model)
         {
             Type = v.Type;
-            Field = v.Field;
+            Field = v.Field.Trim();
             StrValue = v.StrValue;
             DateValue = v.DateValue;
             Data = v.Data;
@@ -55,10 +55,22 @@ namespace CmsWeb.Models.ExtraValues
             Id = v.OrganizationId;
             Model = model;
         }
+        public ExtraValue(ContactExtra v, ExtraValueModel model)
+        {
+            Type = v.Type;
+            Field = v.Field.Trim();
+            StrValue = v.StrValue;
+            DateValue = v.DateValue;
+            Data = v.Data;
+            IntValue = v.IntValue;
+            BitValue = v.BitValue;
+            Id = v.ContactId;
+            Model = model;
+        }
         public ExtraValue(MeetingExtra v, ExtraValueModel model)
         {
             Type = v.Type;
-            Field = v.Field;
+            Field = v.Field.Trim();
             StrValue = v.StrValue;
             DateValue = v.DateValue;
             Data = v.Data;
@@ -70,7 +82,7 @@ namespace CmsWeb.Models.ExtraValues
         public ExtraValue(OrgMemberExtra v, ExtraValueModel model)
         {
             Type = v.Type;
-            Field = v.Field;
+            Field = v.Field.Trim();
             StrValue = v.StrValue;
             DateValue = v.DateValue;
             Data = v.Data;

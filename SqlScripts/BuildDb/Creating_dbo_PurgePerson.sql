@@ -7,6 +7,7 @@ BEGIN
 		BEGIN TRANSACTION  
 		DECLARE @fid INT, @pic INT 
 		DELETE dbo.OrgMemMemTags WHERE PeopleId = @pid 
+		DELETE dbo.OrgMemberExtra WHERE PeopleId = @pid 
 		DELETE dbo.OrganizationMembers WHERE PeopleId = @pid 
 		DELETE dbo.EnrollmentTransaction WHERE PeopleId = @pid 
 		DELETE dbo.CardIdentifiers WHERE PeopleId = @pid 
@@ -22,6 +23,7 @@ BEGIN
 		DELETE dbo.EmailOptOut WHERE ToPeopleId = @pid 
 		DELETE dbo.OrgMemberExtra WHERE PeopleId = @pid 
 		DELETE dbo.PrevOrgMemberExtra WHERE PeopleId = @pid 
+		UPDATE dbo.[Transaction] SET LoginPeopleId = NULL WHERE LoginPeopleId = @pid
  
 		DELETE dbo.EmailResponses  
 		FROM dbo.EmailResponses r 
@@ -31,11 +33,12 @@ BEGIN
 		DELETE dbo.EmailResponses WHERE PeopleId = @pid 
 		DELETE dbo.EmailQueueTo WHERE PeopleId = @pid; 
 		 
-		DELETE dbo.EmailQueueTo FROM dbo.EmailQueueTo et  
-		JOIN EmailQueue e ON e.Id = et.Id 
-		WHERE QueuedBy = @pid 
- 
-		DELETE dbo.EmailQueue WHERE QueuedBy = @pid; 
+		--DELETE dbo.EmailQueueTo FROM dbo.EmailQueueTo et  
+		--JOIN EmailQueue e ON e.Id = et.Id 
+		--WHERE QueuedBy = @pid 
+
+		UPDATE dbo.EmailQueue SET QueuedBy = NULL WHERE QueuedBy = @pid
+		--DELETE dbo.EmailQueue WHERE QueuedBy = @pid; 
  
 		DELETE dbo.GoerSupporter WHERE SupporterId = @pid OR GoerId = @pid 
 		DELETE dbo.GoerSenderAmounts WHERE SupporterId = @pid OR GoerId = @pid 
@@ -88,7 +91,8 @@ BEGIN
 		DELETE dbo.ManagedGiving WHERE PeopleId = @pid 
 		DELETE dbo.PaymentInfo WHERE PeopleId = @pid 
 		DELETE dbo.MemberDocForm WHERE PeopleId = @pid 
-		DELETE dbo.MobileAppPushRegistrations WHERE PeopleId = @pid 
+		DELETE dbo.MobileAppPushRegistrations WHERE PeopleId = @pid
+		DELETE dbo.MobileAppDevices WHERE peopleID = @pid
 		 
 		DELETE dbo.Preferences WHERE UserId IN (SELECT UserId FROM dbo.Users WHERE PeopleId = @pid) 
 		DELETE dbo.ActivityLog WHERE UserId IN (SELECT UserId FROM dbo.Users WHERE PeopleId = @pid) 
@@ -121,6 +125,8 @@ BEGIN
 		DELETE dbo.VolInterestInterestCodes 
 		FROM dbo.VolInterestInterestCodes vc 
 		WHERE vc.PeopleId = @pid 
+
+		DELETE dbo.MobileAppDevices WHERE peopleID = @pid
 		 
 		SELECT @fid = FamilyId, @pic = PictureId FROM dbo.People WHERE PeopleId = @pid 
 		DELETE dbo.FamilyExtra WHERE FamilyId = @fid 
@@ -155,8 +161,6 @@ BEGIN
 		RAISERROR (@ErrorMessage, @ErrorSeverity, @ErrorState); 
 	END CATCH  
 END 
- 
- 
 GO
 IF @@ERROR <> 0 SET NOEXEC ON
 GO

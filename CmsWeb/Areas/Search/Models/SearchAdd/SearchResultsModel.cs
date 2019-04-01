@@ -5,22 +5,22 @@
  * You may obtain a copy of the License at http://bvcms.codeplex.com/license
  */
 
+using CmsData;
+using CmsData.Classes.RoleChecker;
+using CmsWeb.Models;
+using MoreLinq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Web;
-using CmsData;
-using CmsWeb.Models;
-using MoreLinq;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.Search.Models
 {
     public class SearchResultsModel : PagedTableModel<Person, SearchResultInfo>
     {
-        private readonly string[] usersOnlyContextTypes = {"taskdelegate", "taskowner", "taskdelegate2"};
+        private readonly string[] usersOnlyContextTypes = { "taskdelegate", "taskowner", "taskdelegate2" };
 
         public SearchResultsModel()
             : base(null, null, true)
@@ -34,9 +34,10 @@ namespace CmsWeb.Areas.Search.Models
         public string FirstName { get; set; }
         public string LastName { get; set; }
         public string Email { get; set; }
+        public string Phone { get; set; }
 
         [DisplayName("Communication")]
-        public string Phone { get; set; }
+        public string Communication { get; set; }
 
         public string Address { get; set; }
 
@@ -45,7 +46,8 @@ namespace CmsWeb.Areas.Search.Models
 
         public bool UsersOnly => usersOnlyContextTypes.Contains(AddContext.ToLower());
 
-        public bool ShowLimitedSearch => (HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-OrgLeaderLimitedSearchPerson"));
+        public bool ShowLimitedSearch => RoleChecker.HasSetting(SettingName.LimitedSearchPerson, false);
+        public bool OnlineRegTypeSearch { get; set; }
 
         public string HelpLink(string page)
         {
@@ -54,16 +56,27 @@ namespace CmsWeb.Areas.Search.Models
 
         public override IQueryable<Person> DefineModelList()
         {
-            var db = DbUtil.Db;
+            if (ShowLimitedSearch)
+            {
+                return RunLimitedSearch();
+            }
+
+            //var db = Db;
             var q = Util2.OrgLeadersOnly
-                ? db.OrgLeadersOnlyTag2().People(db)
-                : db.People.AsQueryable();
+                ? DbUtil.Db.OrgLeadersOnlyTag2().People(DbUtil.Db)
+                : DbUtil.Db.People.AsQueryable();
 
             if (UsersOnly)
+            {
                 q = q.Where(p => p.Users.Any(uu => uu.UserRoles.Any(ur => ur.Role.RoleName == "Access")));
+            }
 
-            if (ShowLimitedSearch)
-                return RunLimitedSearch();
+            if (OnlineRegTypeSearch)
+            {
+                return from pid in DbUtil.Db.FindPerson(FirstName, LastName, dob.ToDate(), Email, Phone)
+                       join p in q on pid.PeopleId equals p.PeopleId
+                       select p;
+            }
 
             if (Name.HasValue())
             {
@@ -71,15 +84,20 @@ namespace CmsWeb.Areas.Search.Models
                 Util.NameSplit(Name, out first, out last);
 
                 if (first.HasValue())
+                {
                     q = from p in q
                         where (p.LastName.StartsWith(last) || p.MaidenName.StartsWith(last))
                               && (p.FirstName.StartsWith(first) || p.NickName.StartsWith(first) || p.MiddleName.StartsWith(first))
                         select p;
+                }
                 else if (last.AllDigits())
+                {
                     q = from p in q
                         where p.PeopleId == last.ToInt()
                         select p;
+                }
                 else
+                {
                     q = DbUtil.Db.Setting("UseAltnameContains")
                         ? from p in q
                           where p.LastName.StartsWith(last) || p.MaidenName.StartsWith(last) || p.AltName.Contains(last)
@@ -87,45 +105,62 @@ namespace CmsWeb.Areas.Search.Models
                         : from p in q
                           where p.LastName.StartsWith(last) || p.MaidenName.StartsWith(last)
                           select p;
+                }
             }
 
             if (Address.IsNotNull())
             {
                 Address = Address.Trim();
                 if (Address.HasValue())
+                {
                     q = from p in q
                         where p.Family.AddressLineOne.Contains(Address)
                               || p.Family.AddressLineTwo.Contains(Address)
                               || p.Family.CityName.Contains(Address)
                               || p.Family.ZipCode.Contains(Address)
                         select p;
+                }
             }
-            if (Phone.IsNotNull())
+            if (Communication.IsNotNull())
             {
-                Phone = Phone.Trim();
-                if (Phone.HasValue())
+                Communication = Communication.Trim();
+                if (Communication.HasValue())
+                {
                     q = from p in q
-                        where p.CellPhone.Contains(Phone) || p.EmailAddress.Contains(Phone)
-                              || p.Family.HomePhone.Contains(Phone)
-                              || p.WorkPhone.Contains(Phone)
+                        where p.CellPhone.Contains(Communication) || p.EmailAddress.Contains(Communication)
+                              || p.Family.HomePhone.Contains(Communication)
+                              || p.WorkPhone.Contains(Communication)
                         select p;
+                }
             }
             if (dob.HasValue())
             {
                 DateTime dt;
                 if (DateTime.TryParse(dob, out dt))
+                {
                     if (Regex.IsMatch(dob, @"\d+/\d+/\d+"))
+                    {
                         q = q.Where(p => p.BirthDay == dt.Day && p.BirthMonth == dt.Month && p.BirthYear == dt.Year);
+                    }
                     else
+                    {
                         q = q.Where(p => p.BirthDay == dt.Day && p.BirthMonth == dt.Month);
+                    }
+                }
                 else
                 {
                     int n;
                     if (int.TryParse(dob, out n))
+                    {
                         if (n >= 1 && n <= 12)
+                        {
                             q = q.Where(p => p.BirthMonth == n);
+                        }
                         else
+                        {
                             q = q.Where(p => p.BirthYear == n);
+                        }
+                    }
                 }
             }
             return q;
@@ -153,7 +188,9 @@ namespace CmsWeb.Areas.Search.Models
                        CityStateZip = p.PrimaryCity + ", " + p.PrimaryState + " " + (p.PrimaryZip != null && p.PrimaryZip.Length >= 5 ? p.PrimaryZip.Substring(0, 5) : p.PrimaryZip),
                        Age = p.Age,
                        JoinDate = p.JoinDate,
-                       BirthDate = p.BirthMonth + "/" + p.BirthDay + "/" + p.BirthYear,
+                       BirthYear = p.BirthYear,
+                       BirthMon = p.BirthMonth,
+                       BirthDay = p.BirthDay,
                        HomePhone = p.HomePhone,
                        CellPhone = p.CellPhone,
                        WorkPhone = p.WorkPhone,

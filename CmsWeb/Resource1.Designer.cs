@@ -19,10 +19,10 @@ namespace CmsWeb {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "4.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "15.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    internal class Resource1 {
+    public class Resource1 {
         
         private static global::System.Resources.ResourceManager resourceMan;
         
@@ -36,7 +36,7 @@ namespace CmsWeb {
         ///   Returns the cached ResourceManager instance used by this class.
         /// </summary>
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Advanced)]
-        internal static global::System.Resources.ResourceManager ResourceManager {
+        public static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
                     global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("CmsWeb.Resource1", typeof(Resource1).Assembly);
@@ -51,7 +51,7 @@ namespace CmsWeb {
         ///   resource lookups using this strongly typed resource class.
         /// </summary>
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Advanced)]
-        internal static global::System.Globalization.CultureInfo Culture {
+        public static global::System.Globalization.CultureInfo Culture {
             get {
                 return resourceCulture;
             }
@@ -68,7 +68,7 @@ namespace CmsWeb {
         ///The bvCMS Team&lt;/p&gt;
         ///.
         /// </summary>
-        internal static string AccountController_ForgotUsername {
+        public static string AccountController_ForgotUsername {
             get {
                 return ResourceManager.GetString("AccountController_ForgotUsername", resourceCulture);
             }
@@ -83,7 +83,7 @@ namespace CmsWeb {
         ///The BVCMS Team&lt;/p&gt;
         ///.
         /// </summary>
-        internal static string AccountModel_ForgotPasswordBadEmail {
+        public static string AccountModel_ForgotPasswordBadEmail {
             get {
                 return ResourceManager.GetString("AccountModel_ForgotPasswordBadEmail", resourceCulture);
             }
@@ -98,7 +98,7 @@ namespace CmsWeb {
         ///The BVCMS Team&lt;/p&gt;
         ///.
         /// </summary>
-        internal static string AccountModel_ForgotPasswordReset {
+        public static string AccountModel_ForgotPasswordReset {
             get {
                 return ResourceManager.GetString("AccountModel_ForgotPasswordReset", resourceCulture);
             }
@@ -113,7 +113,7 @@ namespace CmsWeb {
         ///The BVCMS Team&lt;/p&gt;
         ///.
         /// </summary>
-        internal static string AccountModel_ForgotPasswordReset2 {
+        public static string AccountModel_ForgotPasswordReset2 {
             get {
                 return ResourceManager.GetString("AccountModel_ForgotPasswordReset2", resourceCulture);
             }
@@ -127,7 +127,7 @@ namespace CmsWeb {
         ///&lt;h3&gt;Your username is: &lt;b&gt;&lt;a href=&quot;{link}&quot;&gt;{username}&lt;/a&gt;&lt;/h3&gt;
         ///&lt;/blockquote&gt;.
         /// </summary>
-        internal static string AccountModel_NewUserWelcome {
+        public static string AccountModel_NewUserWelcome {
             get {
                 return ResourceManager.GetString("AccountModel_NewUserWelcome", resourceCulture);
             }
@@ -155,7 +155,7 @@ namespace CmsWeb {
         ///&lt;li&gt;These are tables of id / value pairs for look up tables&lt;/li&gt;
         ///&lt;li&gt;Try MemberStatus as a name of a table&lt;/ [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string APITestPlan {
+        public static string APITestPlan {
             get {
                 return ResourceManager.GetString("APITestPlan", resourceCulture);
             }
@@ -180,7 +180,7 @@ namespace CmsWeb {
         ///FontSizeEmail: 9 
         ///}.
         /// </summary>
-        internal static string CompactDirectoryParameters {
+        public static string CompactDirectoryParameters {
             get {
                 return ResourceManager.GetString("CompactDirectoryParameters", resourceCulture);
             }
@@ -205,9 +205,18 @@ namespace CmsWeb {
         ///	FontSizeEmail: 5.5
         ///}.
         /// </summary>
-        internal static string CompactDirectoryParameters2 {
+        public static string CompactDirectoryParameters2 {
             get {
                 return ResourceManager.GetString("CompactDirectoryParameters2", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to TouchPoint Software, Inc..
+        /// </summary>
+        public static string CompanyName {
+            get {
+                return ResourceManager.GetString("CompanyName", resourceCulture);
             }
         }
         
@@ -216,9 +225,34 @@ namespace CmsWeb {
         ///You have the following subscriptions:&lt;br/&gt;
         ///{details}.
         /// </summary>
-        internal static string ConfirmSubscriptions {
+        public static string ConfirmSubscriptions {
             get {
                 return ResourceManager.GetString("ConfirmSubscriptions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to 
+        ///with ids as (
+        ///	select * from dbo.Contributions2SearchIds(@json)
+        ///)
+        ///select 
+        ///	p.FamilyId,
+        ///	p.PeopleId,
+        ///    c.ContributionDate as [Date],
+        ///    
+        ///    case when fa.HeadOfHouseholdId = sp.PeopleId
+        ///			and isnull(sp.ContributionOptionsId, case when mssp.Married = 1 then 2 else 1 end) = 2
+        ///			and isnull(p.ContributionOptionsId, case when msp.Married = 1 then 2 else 1 end) = 2
+        ///		then sp.PeopleId 
+        ///		else c.PeopleId 
+        ///	end as CreditGiverId,
+        ///
+        ///    case when isnull(sp.ContributionOptionsId, case when mssp.Marr [rest of string was truncated]&quot;;.
+        /// </summary>
+        public static string ContributionsController_ContributionsAdvancedSearch_ {
+            get {
+                return ResourceManager.GetString("ContributionsController_ContributionsAdvancedSearch_", resourceCulture);
             }
         }
         
@@ -226,7 +260,7 @@ namespace CmsWeb {
         ///   Looks up a localized string similar to &lt;h1&gt;Sample Church&lt;/h1&gt;
         ///&lt;h2&gt;2000 Appling Rd. | Cordova | TN 38088-1210 | (901) 347-2000&lt;/h2&gt;.
         /// </summary>
-        internal static string ContributionStatementHeader {
+        public static string ContributionStatementHeader {
             get {
                 return ResourceManager.GetString("ContributionStatementHeader", resourceCulture);
             }
@@ -243,7 +277,7 @@ namespace CmsWeb {
         ///Thank you for your faithfulness in the giving of your time, talents, and resources. Together we can share the love of Jesus with our city.
         ///&lt;/i&gt;&lt;/p&gt;.
         /// </summary>
-        internal static string ContributionStatementNotice {
+        public static string ContributionStatementNotice {
             get {
                 return ResourceManager.GetString("ContributionStatementNotice", resourceCulture);
             }
@@ -258,14 +292,14 @@ namespace CmsWeb {
         ///This will send you a link you can use to reset your password.&lt;/p&gt;
         ///&lt;p&gt;You can use your account to help us maintain your correct address, [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string CreateAccount_ExistingUser {
+        public static string CreateAccount_ExistingUser {
             get {
                 return ResourceManager.GetString("CreateAccount_ExistingUser", resourceCulture);
             }
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot; ?&gt;
+        ///   Looks up a localized string similar to 
         ///&lt;CustomColumns&gt;
         ///  &lt;Joins&gt;
         ///    &lt;join name=&quot;g&quot;&gt;
@@ -281,9 +315,9 @@ namespace CmsWeb {
         ///      LEFT JOIN dbo.recreg rr ON rr.peopleid = p.peopleid
         ///    &lt;/join&gt;
         ///    &lt;join name=&quot;mo&quot;&gt;
-        ///      LEFT JOIN dbo [rest of string was truncated]&quot;;.
+        ///      LEFT JOIN dbo.people mo ON mo.familyid = p.familyid  [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string CustomColumns {
+        public static string CustomColumns {
             get {
                 return ResourceManager.GetString("CustomColumns", resourceCulture);
             }
@@ -295,7 +329,7 @@ namespace CmsWeb {
         ///It is important that you call the church &lt;strong&gt;{phone}&lt;/strong&gt; to update our records
         ///so that you will receive future important notices regarding this registration.&lt;/p&gt;.
         /// </summary>
-        internal static string DiffEmailMessage {
+        public static string DiffEmailMessage {
             get {
                 return ResourceManager.GetString("DiffEmailMessage", resourceCulture);
             }
@@ -304,9 +338,19 @@ namespace CmsWeb {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
-        internal static byte[] DocxAveryLabel {
+        public static byte[] DocxAveryLabel {
             get {
                 object obj = ResourceManager.GetObject("DocxAveryLabel", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        public static byte[] DocxRollsheet {
+            get {
+                object obj = ResourceManager.GetObject("DocxRollsheet", resourceCulture);
                 return ((byte[])(obj));
             }
         }
@@ -323,7 +367,7 @@ namespace CmsWeb {
         ///  &lt;/Columns&gt;
         ///&lt;/InvolvementTable&gt;.
         /// </summary>
-        internal static string InvolvementTableCurrent {
+        public static string InvolvementTableCurrent {
             get {
                 return ResourceManager.GetString("InvolvementTableCurrent", resourceCulture);
             }
@@ -342,7 +386,7 @@ namespace CmsWeb {
         ///  &lt;/Columns&gt;
         ///&lt;/InvolvementTable&gt;.
         /// </summary>
-        internal static string InvolvementTablePending {
+        public static string InvolvementTablePending {
             get {
                 return ResourceManager.GetString("InvolvementTablePending", resourceCulture);
             }
@@ -360,7 +404,7 @@ namespace CmsWeb {
         ///  &lt;/Columns&gt;
         ///&lt;/InvolvementTable&gt;.
         /// </summary>
-        internal static string InvolvementTablePrevious {
+        public static string InvolvementTablePrevious {
             get {
                 return ResourceManager.GetString("InvolvementTablePrevious", resourceCulture);
             }
@@ -378,7 +422,7 @@ namespace CmsWeb {
         ///
         ///Thank you&lt;/p&gt;.
         /// </summary>
-        internal static string NoEmailMessage {
+        public static string NoEmailMessage {
             get {
                 return ResourceManager.GetString("NoEmailMessage", resourceCulture);
             }
@@ -393,7 +437,7 @@ namespace CmsWeb {
         ///&lt;p&gt;It is important that you contact the church at &lt;strong&gt;{churchphone}&lt;/strong&gt; to update your records
         ///so that your data w [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string NotifyDuplicateUserOnMobile {
+        public static string NotifyDuplicateUserOnMobile {
             get {
                 return ResourceManager.GetString("NotifyDuplicateUserOnMobile", resourceCulture);
             }
@@ -408,7 +452,7 @@ namespace CmsWeb {
         ///    &lt;/p&gt;
         ///    &lt;p style=&apos;color: Blue&apos;&gt;&lt;a href=&apos;{url}&apos;&gt;Start a New Transaction&lt;/a&gt;&lt;/p&gt;.
         /// </summary>
-        internal static string OnlineRegModel_ThankYouMessage {
+        public static string OnlineRegModel_ThankYouMessage {
             get {
                 return ResourceManager.GetString("OnlineRegModel_ThankYouMessage", resourceCulture);
             }
@@ -422,7 +466,7 @@ namespace CmsWeb {
         ///&lt;p&gt;Thank you!&lt;br/&gt;
         ///{church}&lt;/p&gt;.
         /// </summary>
-        internal static string OrgMembersModel_SendMovedNotices {
+        public static string OrgMembersModel_SendMovedNotices {
             get {
                 return ResourceManager.GetString("OrgMembersModel_SendMovedNotices", resourceCulture);
             }
@@ -441,7 +485,7 @@ namespace CmsWeb {
         ///	&lt;Field dropdown=&quot;true&quot; label=&quot;Schedule&quot;&gt;ScheduleId&lt;/Field&gt;
         ///	&lt;Field dropdown=&quot;true&quot; label=&quot;Online Registration&quot;&gt;OnlineReg&lt;/F [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string OrgSearchFields {
+        public static string OrgSearchFields {
             get {
                 return ResourceManager.GetString("OrgSearchFields", resourceCulture);
             }
@@ -467,7 +511,7 @@ namespace CmsWeb {
         ///	Email = p.EmailAddress,
         ///	Email2 = p.EmailAddress [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string PictureDirectorySql {
+        public static string PictureDirectorySql {
             get {
                 return ResourceManager.GetString("PictureDirectorySql", resourceCulture);
             }
@@ -492,7 +536,7 @@ namespace CmsWeb {
         ///      border: 1px solid #e6e6e6;
         ///      padding-t [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string PictureDirectoryTemplate {
+        public static string PictureDirectoryTemplate {
             get {
                 return ResourceManager.GetString("PictureDirectoryTemplate", resourceCulture);
             }
@@ -514,7 +558,7 @@ namespace CmsWeb {
         ///        or more consecutive absents on and before {{Fmt LastMeeting &quot;d&quot;}}
         /// [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string RecentVisitsAbsents {
+        public static string RecentVisitsAbsents {
             get {
                 return ResourceManager.GetString("RecentVisitsAbsents", resourceCulture);
             }
@@ -523,38 +567,16 @@ namespace CmsWeb {
         /// <summary>
         ///   Looks up a localized string similar to &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
         ///&lt;ReportsMenu&gt;
-        ///  &lt;Header&gt;Statistics&lt;/Header&gt;
-        ///  &lt;Report link=&quot;/Reports/VitalStats&quot;&gt;Vital Stats&lt;/Report&gt;
+        ///  &lt;Header excludedRoles=&quot;OrgLeadersOnly&quot;&gt;Statistics&lt;/Header&gt;
+        ///  &lt;Report excludedRoles=&quot;OrgLeadersOnly&quot; link=&quot;/Reports/VitalStats&quot;&gt;Vital Stats&lt;/Report&gt;
+        ///  &lt;Report excludedRoles=&quot;OrgLeadersOnly&quot; link=&quot;/Figures/Figures/Index&quot;&gt;Vital Stats Graphs&lt;/Report&gt;
         ///  &lt;Header&gt;Attendance Summary&lt;/Header&gt;
         ///  &lt;Report link=&quot;/Reports/ChurchAttendance&quot; target=&quot;_blank&quot;&gt;Week at a Glance&lt;/Report&gt;
-        ///  &lt;Report link=&quot;/Reports/ChurchAttendance2&quot; target=&quot;_blank&quot;&gt;Average Week at a Glance&lt;/Report&gt;
-        ///  &lt;Header&gt;Decisions&lt;/Header&gt;
-        ///  &lt;Report link=&quot;/Reports/WeeklyDecisions&quot; target=&quot;_blank&quot;&gt;Weekly Decisions&lt;/Report&gt;
-        ///  &lt;Report link=&quot;/Reports/Decisio [rest of string was truncated]&quot;;.
+        ///  &lt;Report link=&quot;/Reports/ChurchAttendance2&quot; target=&quot;_blank&quot;&gt;Average Week at a Gl [rest of string was truncated]&quot;;.
         /// </summary>
-        internal static string ReportsMenu {
+        public static string ReportsMenu {
             get {
                 return ResourceManager.GetString("ReportsMenu", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to &lt;?xml version=&quot;1.0&quot; encoding=&quot;utf-8&quot;?&gt;
-        ///&lt;ReportsMenu&gt;
-        ///  &lt;Column1&gt;
-        ///&lt;!--
-        ///    &lt;Header&gt;Statistics&lt;/Header&gt;
-        ///    &lt;Report link=&quot;/Reports/VitalStats&quot;&gt;Vital Stats&lt;/Report&gt;
-        ///--&gt;
-        ///  &lt;/Column1&gt;
-        ///  &lt;Column2&gt;
-        ///  &lt;/Column2&gt;
-        ///&lt;/ReportsMenu&gt;
-        ///.
-        /// </summary>
-        internal static string ReportsMenuCustom {
-            get {
-                return ResourceManager.GetString("ReportsMenuCustom", resourceCulture);
             }
         }
         
@@ -567,7 +589,7 @@ namespace CmsWeb {
         ///Your Ministry Team for {org}
         ///&lt;/p&gt;.
         /// </summary>
-        internal static string SettingsRegistrationModel_DefaulConfirmation {
+        public static string SettingsRegistrationModel_DefaulConfirmation {
             get {
                 return ResourceManager.GetString("SettingsRegistrationModel_DefaulConfirmation", resourceCulture);
             }
@@ -595,7 +617,7 @@ namespace CmsWeb {
         ///{sendername}
         ///&lt;/p&gt;.
         /// </summary>
-        internal static string VolSubModel_ComposeMessage_Body {
+        public static string VolSubModel_ComposeMessage_Body {
             get {
                 return ResourceManager.GetString("VolSubModel_ComposeMessage_Body", resourceCulture);
             }
@@ -610,7 +632,7 @@ namespace CmsWeb {
         ///on {meetingdate} at {meetingtime}.
         ///See you there!&lt;/p&gt;.
         /// </summary>
-        internal static string VolSubModel_VolunteerSubConfirm {
+        public static string VolSubModel_VolunteerSubConfirm {
             get {
                 return ResourceManager.GetString("VolSubModel_VolunteerSubConfirm", resourceCulture);
             }
@@ -632,7 +654,7 @@ namespace CmsWeb {
         ///{sendername}
         ///&lt;/p&gt;.
         /// </summary>
-        internal static string VolunteerRequestModel_ComposeMessage_Body {
+        public static string VolunteerRequestModel_ComposeMessage_Body {
             get {
                 return ResourceManager.GetString("VolunteerRequestModel_ComposeMessage_Body", resourceCulture);
             }

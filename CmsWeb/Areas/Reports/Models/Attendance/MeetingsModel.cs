@@ -1,8 +1,8 @@
+using CmsData;
+using CmsWeb.Areas.Search.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using CmsData;
-using CmsWeb.Areas.Search.Models;
 
 namespace CmsWeb.Areas.Reports.Models
 {
@@ -54,7 +54,9 @@ namespace CmsWeb.Areas.Reports.Models
                             Inactive = o.OrganizationStatusId == CmsData.Codes.OrgStatusCode.Inactive
                         }).ToList();
             if (NoZero == false)
+            {
                 list = list.Where(m => m.Inactive == false).ToList();
+            }
 
             MeetingsCount = list.Count(a => a.Attended > 0);
             TotalAttends = list.Sum(m => m.Attended ?? 0);
@@ -96,7 +98,7 @@ namespace CmsWeb.Areas.Reports.Models
                     return from m in list
                            orderby m.Leader, m.Time, m.Division, m.Organization
                            select m;
-                case "Time":
+                case "Meeting Time":
                     return from m in list
                            orderby m.Time, m.Division, m.Organization
                            select m;
@@ -122,9 +124,15 @@ namespace CmsWeb.Areas.Reports.Models
             cc.Reset();
             var c = cc.AddNewClause(type == "Guests" ? QueryType.GuestAsOf : QueryType.AttendedAsOf, CompareType.Equal, "1,True");
             if (ProgramId.HasValue && ProgramId > 0)
+            {
                 c.Program = ProgramId.Value.ToString();
+            }
+
             if (DivisionId.HasValue && DivisionId > 0)
+            {
                 c.Division = DivisionId.Value.ToString();
+            }
+
             c.StartDate = Dt1;
             c.EndDate = Dt2;
             cc.Save(DbUtil.Db);

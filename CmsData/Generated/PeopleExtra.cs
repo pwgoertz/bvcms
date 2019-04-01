@@ -20,13 +20,13 @@ namespace CmsData
 		
 		private int _PeopleId;
 		
+		private DateTime _TransactionTime;
+		
 		private string _Field;
 		
 		private string _StrValue;
 		
 		private DateTime? _DateValue;
-		
-		private DateTime _TransactionTime;
 		
 		private string _Data;
 		
@@ -42,11 +42,15 @@ namespace CmsData
 		
 		private int _Instance;
 		
+		private bool? _IsAttributes;
+		
 		private string _Type;
+		
+		private string _Metadata;
 		
    		
     	
-		private EntityRef< Person> _Person;
+		private EntityRef<Person> _Person;
 		
 	#endregion
 	
@@ -58,6 +62,9 @@ namespace CmsData
 		partial void OnPeopleIdChanging(int value);
 		partial void OnPeopleIdChanged();
 		
+		partial void OnTransactionTimeChanging(DateTime value);
+		partial void OnTransactionTimeChanged();
+		
 		partial void OnFieldChanging(string value);
 		partial void OnFieldChanged();
 		
@@ -66,9 +73,6 @@ namespace CmsData
 		
 		partial void OnDateValueChanging(DateTime? value);
 		partial void OnDateValueChanged();
-		
-		partial void OnTransactionTimeChanging(DateTime value);
-		partial void OnTransactionTimeChanged();
 		
 		partial void OnDataChanging(string value);
 		partial void OnDataChanged();
@@ -91,15 +95,21 @@ namespace CmsData
 		partial void OnInstanceChanging(int value);
 		partial void OnInstanceChanged();
 		
+		partial void OnIsAttributesChanging(bool? value);
+		partial void OnIsAttributesChanged();
+		
 		partial void OnTypeChanging(string value);
 		partial void OnTypeChanged();
+		
+		partial void OnMetadataChanging(string value);
+		partial void OnMetadataChanged();
 		
     #endregion
 		public PeopleExtra()
 		{
 			
 			
-			this._Person = default(EntityRef< Person>); 
+			this._Person = default(EntityRef<Person>); 
 			
 			OnCreated();
 		}
@@ -126,6 +136,28 @@ namespace CmsData
 					this._PeopleId = value;
 					this.SendPropertyChanged("PeopleId");
 					this.OnPeopleIdChanged();
+				}
+
+			}
+
+		}
+
+		
+		[Column(Name="TransactionTime", UpdateCheck=UpdateCheck.Never, Storage="_TransactionTime", DbType="datetime NOT NULL")]
+		public DateTime TransactionTime
+		{
+			get { return this._TransactionTime; }
+
+			set
+			{
+				if (this._TransactionTime != value)
+				{
+				
+                    this.OnTransactionTimeChanging(value);
+					this.SendPropertyChanging();
+					this._TransactionTime = value;
+					this.SendPropertyChanged("TransactionTime");
+					this.OnTransactionTimeChanged();
 				}
 
 			}
@@ -192,28 +224,6 @@ namespace CmsData
 					this._DateValue = value;
 					this.SendPropertyChanged("DateValue");
 					this.OnDateValueChanged();
-				}
-
-			}
-
-		}
-
-		
-		[Column(Name="TransactionTime", UpdateCheck=UpdateCheck.Never, Storage="_TransactionTime", DbType="datetime NOT NULL")]
-		public DateTime TransactionTime
-		{
-			get { return this._TransactionTime; }
-
-			set
-			{
-				if (this._TransactionTime != value)
-				{
-				
-                    this.OnTransactionTimeChanging(value);
-					this.SendPropertyChanging();
-					this._TransactionTime = value;
-					this.SendPropertyChanged("TransactionTime");
-					this.OnTransactionTimeChanged();
 				}
 
 			}
@@ -375,6 +385,28 @@ namespace CmsData
 		}
 
 		
+		[Column(Name="IsAttributes", UpdateCheck=UpdateCheck.Never, Storage="_IsAttributes", DbType="bit")]
+		public bool? IsAttributes
+		{
+			get { return this._IsAttributes; }
+
+			set
+			{
+				if (this._IsAttributes != value)
+				{
+				
+                    this.OnIsAttributesChanging(value);
+					this.SendPropertyChanging();
+					this._IsAttributes = value;
+					this.SendPropertyChanged("IsAttributes");
+					this.OnIsAttributesChanged();
+				}
+
+			}
+
+		}
+
+		
 		[Column(Name="Type", UpdateCheck=UpdateCheck.Never, Storage="_Type", DbType="varchar(18) NOT NULL", IsDbGenerated=true)]
 		public string Type
 		{
@@ -390,6 +422,28 @@ namespace CmsData
 					this._Type = value;
 					this.SendPropertyChanged("Type");
 					this.OnTypeChanged();
+				}
+
+			}
+
+		}
+
+		
+		[Column(Name="Metadata", UpdateCheck=UpdateCheck.Never, Storage="_Metadata", DbType="nvarchar")]
+		public string Metadata
+		{
+			get { return this._Metadata; }
+
+			set
+			{
+				if (this._Metadata != value)
+				{
+				
+                    this.OnMetadataChanging(value);
+					this.SendPropertyChanging();
+					this._Metadata = value;
+					this.SendPropertyChanged("Metadata");
+					this.OnMetadataChanged();
 				}
 
 			}

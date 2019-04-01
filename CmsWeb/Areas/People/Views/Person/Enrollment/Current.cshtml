@@ -1,5 +1,7 @@
 ﻿@using CmsData
+@using CmsData.Codes
 @using CmsWeb.Areas.People.Models
+@using CsQuery.ExtensionMethods.Internal
 @using UtilityExtensions
 @model CurrentEnrollments
 @{
@@ -9,7 +11,6 @@
 }
 <form class="non-modal ajax">
     @FormAction()
-    <br/>
     <div class="row">
         <div class="col-sm-12">
             @Html.Partial("PagerTop", Model)
@@ -96,7 +97,10 @@
                                                 <span>@om.Schedule</span>
                                             }
                                             <div>
-                                                <a href="/OrgContent/@om.OrgId">Members Page</a>
+                                                @if (!om.IsProspect)
+                                                {
+                                                    <a href="/OrgContent/@om.OrgId">Members Page</a>
+                                                }
                                                 @if (om.HasDirectory)
                                                 {
                                                     <a title="@om.DivisionName" href="/MemberDirectory/@om.OrgId">Online Directory</a>

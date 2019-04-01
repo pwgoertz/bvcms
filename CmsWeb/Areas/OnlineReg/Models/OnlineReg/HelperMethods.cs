@@ -1,14 +1,15 @@
+using CmsData;
+using CmsData.Codes;
+using CmsData.Registration;
+using CmsWeb.Areas.Dialog.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Web;
 using System.Xml.Serialization;
-using CmsData;
-using CmsData.Registration;
 using UtilityExtensions;
-using System.Text.RegularExpressions;
-using CmsData.Codes;
 using Person = CmsData.Person;
 
 namespace CmsWeb.Areas.OnlineReg.Models
@@ -17,11 +18,11 @@ namespace CmsWeb.Areas.OnlineReg.Models
     {
         //        public static Organization CreateAccountOrg()
         //        {
-        //            var settings = HttpContext.Current.Items["RegSettings"] as Dictionary<int, Settings>;
+        //            var settings = HttpContextFactory.Current.Items["RegSettings"] as Dictionary<int, Settings>;
         //            if (settings == null)
         //            {
         //                settings = new Dictionary<int, Settings>();
-        //                HttpContext.Current.Items.Add("RegSettings", settings);
+        //                HttpContextFactory.Current.Items.Add("RegSettings", settings);
         //            }
         //            var o = new Organization { OrganizationId = Util.CreateAccountCode, OrganizationName = "My Data" };
         //            o.RegistrationTypeId = RegistrationTypeCode.CreateAccount;
@@ -37,11 +38,14 @@ namespace CmsWeb.Areas.OnlineReg.Models
             get
             {
                 if (_settings == null)
-                    _settings = HttpContext.Current.Items["RegSettings"] as Dictionary<int, Settings>;
+                {
+                    _settings = HttpContextFactory.Current.Items["RegSettings"] as Dictionary<int, Settings>;
+                }
+
                 if (_settings == null)
                 {
                     ParseSettings();
-                    _settings = HttpContext.Current.Items["RegSettings"] as Dictionary<int, Settings>;
+                    _settings = HttpContextFactory.Current.Items["RegSettings"] as Dictionary<int, Settings>;
                 }
                 return _settings;
             }
@@ -57,7 +61,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
             get
             {
                 if (user != null)
+                {
                     return user.Name;
+                }
+
                 return "anonymous";
             }
         }
@@ -72,7 +79,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
             get
             {
                 if (_list.Count > 0)
+                {
                     return _list[_list.Count - 1];
+                }
+
                 return null;
             }
         }
@@ -85,7 +95,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
         public bool IsCreateAccount()
         {
             if (org != null)
+            {
                 return org.RegistrationTypeId == RegistrationTypeCode.CreateAccount;
+            }
+
             return false;
         }
 
@@ -97,33 +110,59 @@ namespace CmsWeb.Areas.OnlineReg.Models
         private bool IsEnded(Organization o)
         {
             if (o != null)
+            {
                 return o.ClassFilled == true;
+            }
+
             return false;
         }
 
-        public bool AllowAnonymous
+        public bool AllowReregister
         {
-            get { return allowAnonymous(masterorgid) && allowAnonymous(Orgid); }
+            get
+            {
+                if (!Orgid.HasValue)
+                {
+                    return false;
+                }
+
+                return settings.ContainsKey(Orgid.Value) && settings[Orgid.Value].AllowReRegister;
+            }
         }
 
-        private bool allowAnonymous(int? id)
+        public bool AllowAnonymous => _allowAnonymous(masterorgid) && _allowAnonymous(Orgid);
+
+        private bool _allowAnonymous(int? id)
         {
             if (RegisterLinkMaster())
+            {
                 return false;
+            }
+
             if (id.HasValue)
+            {
                 if (settings.ContainsKey(id.Value))
+                {
                     return !settings[id.Value].DisallowAnonymous;
+                }
+            }
+
             return true;
         }
 
         private bool Filled(Organization o)
         {
             if (SupportMissionTrip)
+            {
                 return false;
+            }
+
             if (o != null)
             {
                 if ((o.ClassFilled ?? false) || (o.Limit > 0 && o.Limit <= o.RegLimitCount(DbUtil.Db)))
+                {
                     return true;
+                }
             }
             return false;
         }
@@ -136,19 +175,31 @@ namespace CmsWeb.Areas.OnlineReg.Models
         public bool NotAvailable()
         {
             if (SupportMissionTrip)
+            {
                 return false;
-            var dt = DateTime.Now;
+            }
+
+            var dt = Util.Now;
             var dt1 = DateTime.Parse("1/1/1900");
             var dt2 = DateTime.Parse("1/1/2200");
             if (masterorgid.HasValue)
+            {
                 return masterorg.RegistrationClosed == true
                        || masterorg.OrganizationStatusId == OrgStatusCode.Inactive
                        || dt < (masterorg.RegStart ?? dt1)
                        || (dt > (masterorg.RegEnd ?? dt2) && !GoerSupporterId.HasValue);
+            }
+
             return org.RegistrationClosed == true
                    || org.OrganizationStatusId == OrgStatusCode.Inactive
                    || dt < (org.RegStart ?? dt1)
                    || (dt > (org.RegEnd ?? dt2) && !GoerSupporterId.HasValue);
+        }
+
+        public bool NotActive()
+        {
+            var organization = _org ?? _masterOrg;
+            return organization == null || organization.OrganizationStatusId == OrgStatusCode.Inactive;
         }
 
         public bool UserSelectsOrganization()
@@ -159,7 +210,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
         public bool OnlyOneAllowed()
         {
             if (ManagingSubscriptions())
+            {
                 return true;
+            }
+
             if (org != null)
             {
                 var setting = settings[org.OrganizationId];
@@ -191,7 +245,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
         public bool ChoosingSlots()
         {
             if (org != null)
+            {
                 return org.RegistrationTypeId == RegistrationTypeCode.ChooseVolunteerTimes;
+            }
+
             return false;
         }
 
@@ -208,21 +265,30 @@ namespace CmsWeb.Areas.OnlineReg.Models
         public bool OnlinePledge()
         {
             if (org != null)
+            {
                 return org.RegistrationTypeId == RegistrationTypeCode.OnlinePledge;
+            }
+
             return false;
         }
 
         public bool ManageGiving()
         {
             if (org != null)
+            {
                 return org.RegistrationTypeId == RegistrationTypeCode.ManageGiving;
+            }
+
             return false;
         }
 
         public bool OnlineGiving()
         {
             if (org != null)
+            {
                 return org.RegistrationTypeId == RegistrationTypeCode.OnlineGiving;
+            }
+
             return false;
         }
         public bool ShouldPullSpecificFund()
@@ -235,43 +301,70 @@ namespace CmsWeb.Areas.OnlineReg.Models
         public bool NoCreditCardsAllowed()
         {
             if (org != null)
+            {
                 return org.NoCreditCards == true;
+            }
+
             return List.Any(p => p.org.NoCreditCards == true);
         }
 
         public bool AskDonation()
         {
             if (org != null)
+            {
                 return settings[org.OrganizationId].AskDonation;
+            }
+
             if (settings == null)
+            {
                 return false;
+            }
+
             return settings.Values.Any(o => o.AskDonation);
         }
 
         public bool AllowSaveProgress()
         {
             if (SupportMissionTrip)
+            {
                 return false;
+            }
+
             if (UserPeopleId == null)
+            {
                 return false;
+            }
+
             return SaveProgressChecked();
         }
 
         public bool SaveProgressChecked()
         {
             if (org != null)
+            {
                 return settings[org.OrganizationId].AllowSaveProgress;
+            }
+
             if (settings == null)
+            {
                 return false;
+            }
+
             if (masterorg?.RegistrationTypeId == RegistrationTypeCode.ComputeOrgByAge)
+            {
                 return false;
+            }
+
             return settings.Values.Any(o => o.AllowSaveProgress);
         }
 
         public string DonationLabel()
         {
             if (org != null)
+            {
                 return settings[org.OrganizationId].DonationLabel;
+            }
+
             return settings.Values.First(o => o.AskDonation).DonationLabel;
         }
 
@@ -280,19 +373,27 @@ namespace CmsWeb.Areas.OnlineReg.Models
             get
             {
                 if (masterorgid.HasValue)
+                {
                     return masterorg.Title;
+                }
+
                 if (SupportMissionTrip)
                 {
                     if (GoerId.HasValue)
                     {
                         var g = DbUtil.Db.LoadPersonById(GoerId.Value);
                         if (g != null)
+                        {
                             return $"Support: {org.Title} ({g.Name})";
+                        }
                     }
                     return "Support: " + org.Title;
                 }
                 if (settings != null && org != null && settings.ContainsKey(org.OrganizationId))
+                {
                     return org.Title;
+                }
+
                 return org == null ? "Missing Org" : org.Title;
             }
         }
@@ -309,18 +410,30 @@ namespace CmsWeb.Areas.OnlineReg.Models
                         {
                             var accountcode = settings[masterorgid.Value].AccountingCode;
                             if (accountcode.HasValue())
+                            {
                                 return $"{masterorg.OrganizationName} ({accountcode})";
+                            }
+
                             return masterorg.OrganizationName;
                         }
                     }
                     catch (Exception)
                     {
                         if (masterorgid == null)
+                        {
                             throw new Exception("masterorgid was null");
+                        }
+
                         if (settings == null)
+                        {
                             throw new Exception("settings was null");
+                        }
+
                         if (settings[masterorgid.Value] == null)
+                        {
                             throw new Exception("setting not found for masterorgid " + masterorgid.Value);
+                        }
+
                         throw;
                     }
                 }
@@ -328,14 +441,17 @@ namespace CmsWeb.Areas.OnlineReg.Models
                 {
                     var accountcode = settings[org.OrganizationId].AccountingCode;
                     if (accountcode.HasValue())
+                    {
                         return $"{org.OrganizationName} ({accountcode})";
+                    }
+
                     return org.OrganizationName;
                 }
                 return org?.OrganizationName ?? "no org";
             }
         }
 
-        public string SubmitInstructions() 
+        public string SubmitInstructions()
         {
             Settings v;
             settings.TryGetValue(org?.OrganizationId ?? 0, out v);
@@ -350,10 +466,16 @@ namespace CmsWeb.Areas.OnlineReg.Models
                 {
                     var setting1 = new Settings();
                     if (settings.ContainsKey(masterorg.OrganizationId))
+                    {
                         setting1 = settings[masterorg.OrganizationId];
+                    }
+
                     var setting2 = setting1;
                     if (last != null && last.org != null && settings.ContainsKey(last.org.OrganizationId))
+                    {
                         setting1 = settings[last.org.OrganizationId];
+                    }
+
                     return $@"
 <div class=""instructions login"">{Util.PickFirst(setting1.InstructionLogin, setting2.InstructionLogin)}</div>
 <div class=""instructions select"">{Util.PickFirst(setting1.InstructionSelect, setting2.InstructionSelect)}</div>
@@ -366,13 +488,22 @@ namespace CmsWeb.Areas.OnlineReg.Models
                 }
                 var setting = new Settings();
                 if (settings.ContainsKey(org.OrganizationId))
+                {
                     setting = settings[org.OrganizationId];
+                }
+
                 if (setting.InstructionAll != null)
+                {
                     if (setting.InstructionAll.ToString().HasValue())
+                    {
                         return setting.InstructionAll.ToString();
+                    }
+                }
+
                 var v = $"{setting.InstructionLogin}{setting.InstructionSelect}{setting.InstructionFind}{setting.InstructionOptions}{setting.InstructionSubmit}{setting.InstructionSpecial}{setting.InstructionSorry}";
                 string ins = null;
                 if (v.HasValue())
+                {
                     ins = $@"<div class=""instructions login"">{setting.InstructionLogin}</div>
 <div class=""instructions select"">{setting.InstructionSelect}</div>
 <div class=""instructions find"">{setting.InstructionFind}</div>
@@ -380,8 +511,13 @@ namespace CmsWeb.Areas.OnlineReg.Models
 <div class=""instructions submit"">{setting.InstructionSubmit}</div>
 <div class=""instructions special"">{setting.InstructionSpecial}</div>
 <div class=""instructions sorry"">{setting.InstructionSorry}</div>";
+                }
+
                 if (ins.Contains("{ev:", ignoreCase: true))
+                {
                     ins = DoReplaceForExtraValueCode(ins, last.person);
+                }
+
                 return ins + "\n";
             }
         }
@@ -398,24 +534,43 @@ namespace CmsWeb.Areas.OnlineReg.Models
                 var name = match.Groups["name"].Value;
 
                 if (p == null)
+                {
                     text = text.Replace(tag, "");
+                }
                 else
+                {
                     text = text.Replace(tag, p.GetExtra(name));
+                }
+
                 match = match.NextMatch();
             }
             return text;
         }
+
+        public static string YouMustAgreeStatement(int? orgid) => Util.PickFirst(
+            Organization.GetExtra(DbUtil.Db, orgid, "YouMustAgreeStatement"),
+            "<p>You must agree to the terms above for you or your minor child before you can continue with confirmation.</p>");
 
         public string Terms
         {
             get
             {
                 if (masterorgid.HasValue)
+                {
                     if (settings.ContainsKey(masterorgid.Value))
+                    {
                         return Util.PickFirst(settings[masterorgid.Value].Terms, "");
+                    }
+                }
+
                 if (Orgid.HasValue)
+                {
                     if (settings.ContainsKey(Orgid.Value))
+                    {
                         return Util.PickFirst(settings[org.OrganizationId].Terms, "");
+                    }
+                }
+
                 return "";
             }
         }
@@ -426,11 +581,21 @@ namespace CmsWeb.Areas.OnlineReg.Models
             {
                 var trackcode = DbUtil.Db.ContentText("OnlineRegTrackCode", "");
                 if (masterorgid.HasValue)
+                {
                     if (settings.ContainsKey(masterorgid.Value))
+                    {
                         return Util.PickFirst(settings[masterorgid.Value].ConfirmationTrackingCode, trackcode);
+                    }
+                }
+
                 if (Orgid.HasValue)
+                {
                     if (settings.ContainsKey(Orgid.Value))
+                    {
                         return Util.PickFirst(settings[org.OrganizationId].ConfirmationTrackingCode, trackcode);
+                    }
+                }
+
                 return "";
             }
         }
@@ -440,6 +605,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
             var person = DbUtil.Db.LoadPersonById(id);
             var p = new OnlineRegPersonModel
             {
+                Campus = person.CampusId.GetValueOrDefault().ToString(),
                 DateOfBirth = person.DOB,
                 EmailAddress = person.EmailAddress.HasValue() ? person.EmailAddress : user.EmailAddress,
                 FirstName = person.PreferredName,
@@ -459,7 +625,9 @@ namespace CmsWeb.Areas.OnlineReg.Models
                 {
                     var om = org.OrganizationMembers.SingleOrDefault(mm => mm.PeopleId == id);
                     if (om != null)
+                    {
                         p.RepopulateRegistration(om);
+                    }
                 }
             }
             return p;
@@ -476,17 +644,26 @@ namespace CmsWeb.Areas.OnlineReg.Models
             {
                 var setting1 = new Settings();
                 if (settings.ContainsKey(masterorg.OrganizationId))
+                {
                     setting1 = settings[masterorg.OrganizationId];
+                }
+
                 var setting2 = setting1;
                 if (last != null && last.org != null && settings.ContainsKey(last.org.OrganizationId))
+                {
                     setting1 = settings[last.org.OrganizationId];
+                }
+
                 msg = Util.PickFirst(setting1.ThankYouMessage, setting2.ThankYouMessage, def);
             }
             else
             {
                 var setting = new Settings();
                 if (settings.ContainsKey(org.OrganizationId))
+                {
                     setting = settings[org.OrganizationId];
+                }
+
                 msg = Util.PickFirst(setting.ThankYouMessage, def);
             }
             msg = msg.Replace("{org}", Header)
@@ -505,17 +682,26 @@ namespace CmsWeb.Areas.OnlineReg.Models
             {
                 var setting1 = new Settings();
                 if (settings.ContainsKey(masterorg.OrganizationId))
+                {
                     setting1 = settings[masterorg.OrganizationId];
+                }
+
                 var setting2 = setting1;
                 if (last?.org != null && settings.ContainsKey(last.org.OrganizationId))
+                {
                     setting1 = settings[last.org.OrganizationId];
+                }
+
                 text = Util.PickFirst(setting1.FinishRegistrationButton, setting2.FinishRegistrationButton, def);
             }
             else
             {
                 var setting = new Settings();
                 if (settings.ContainsKey(org.OrganizationId))
+                {
                     setting = settings[org.OrganizationId];
+                }
+
                 text = Util.PickFirst(setting.FinishRegistrationButton, def);
             }
             return text;
@@ -533,11 +719,20 @@ namespace CmsWeb.Areas.OnlineReg.Models
                         ? 1600000
                         : DbUtil.Db.Setting("RegTimeout", "180000").ToInt();
                     if (masterorgid.HasValue)
+                    {
                         if (settings.ContainsKey(masterorgid.Value))
+                        {
                             timeOut = settings[masterorgid.Value].TimeOut ?? timeOut;
+                        }
+                    }
+
                     if (Orgid.HasValue)
+                    {
                         if (settings.ContainsKey(Orgid.Value))
+                        {
                             timeOut = settings[org.OrganizationId].TimeOut ?? timeOut;
+                        }
+                    }
                 }
                 return timeOut.Value;
             }
@@ -554,10 +749,15 @@ namespace CmsWeb.Areas.OnlineReg.Models
             {
                 // Don't create a new Datum if there is no data yet.
                 if (List.Count == 0)
+                {
                     return;
+                }
+
                 var p = FirstRegistrant;
                 if (List.Count > 0 && !p.FirstName.HasValue() && !p.LastName.HasValue() && p.EmailAddress.HasValue())
+                {
                     return;
+                }
 
                 Datum = new RegistrationDatum
                 {
@@ -571,7 +771,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
             }
             Datum.Data = Util.Serialize<OnlineRegModel>(this);
             if (completed)
+            {
                 Datum.Completed = true;
+            }
+
             if (abandoned)
             {
                 Datum.Abandoned = true;
@@ -589,20 +792,38 @@ namespace CmsWeb.Areas.OnlineReg.Models
         {
             var ed = DbUtil.Db.RegistrationDatas.SingleOrDefault(e => e.Id == id);
             if (ed == null)
+            {
                 return null;
+            }
+
             if (ed.Completed == true || ed.Abandoned == true)
+            {
                 return null;
-            var m = Util.DeSerialize<OnlineRegModel>(ed.Data);
-            m.Datum = ed;
-            m.DatumId = id;
-            m.Completed = ed.Completed ?? false;
-            return m;
+            }
+
+            try
+            {
+                var m = Util.DeSerialize<OnlineRegModel>(ed.Data);
+                m.Datum = ed;
+                m.DatumId = id;
+                m.Completed = ed.Completed ?? false;
+                return m;
+            }
+#pragma warning disable CS0168 // Variable is declared but never used
+            catch (Exception e)
+#pragma warning restore CS0168 // Variable is declared but never used
+            {
+                return null;
+            }
         }
 
         public OnlineRegModel GetExistingRegistration(int pid)
         {
             if (!AllowSaveProgress())
+            {
                 return null;
+            }
+
             var dt30 = DateTime.Now.AddDays(-30);
             var ed = (from e in DbUtil.Db.RegistrationDatas
                       let o = DbUtil.Db.Organizations.SingleOrDefault(oo => oo.OrganizationId == (masterorgid ?? _orgid))
@@ -621,13 +842,13 @@ namespace CmsWeb.Areas.OnlineReg.Models
 #if DEBUG
         public void DebugCleanUp()
         {
-//            var q = from om in DbUtil.Db.OrganizationMembers
-//                    where new[] {828612, Util.UserPeopleId}.Contains(om.PeopleId)
-//                    where om.OrganizationId == Orgid
-//                    select om;
             var q = from om in DbUtil.Db.OrganizationMembers
-                    where new[] {2192117,2192118}.Contains(om.OrganizationId)
+                    where new[] { 828612, Util.UserPeopleId }.Contains(om.PeopleId)
+                    where om.OrganizationId == Orgid
                     select om;
+            //            var q = from om in DbUtil.Db.OrganizationMembers
+            //                    where new[] {2192117,2192118}.Contains(om.OrganizationId)
+            //                    select om;
             foreach (var om in q)
             {
                 om.Drop(DbUtil.Db, DateTime.Now);
@@ -637,7 +858,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
             //                DbUtil.Db.ExecuteCommand(@"
             //DELETE dbo.EnrollmentTransaction WHERE PeopleId = 58207 AND OrganizationId = 2202
             //
-            //IF OBJECT_ID('tempdb..#t') IS NOT NULL
+            //IF OBJECT_ID('tempDbUtil.Db..#t') IS NOT NULL
             //   DROP TABLE #t
             //
             //SELECT c.ContributionId INTO #t
@@ -665,7 +886,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
         // Make sure that we only use the 5 find fields and no previous data from a previous find attempt
         public OnlineRegPersonModel GetFreshFindInfo(int id)
         {
-            var p = List[id]; 
+            var p = List[id];
             List[id] = new OnlineRegPersonModel
             {
                 FirstName = p.FirstName,
@@ -683,6 +904,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
             HistoryAdd("Cancel id=" + n);
             List.RemoveAt(n);
             if (List.Count == 0)
+            {
                 List.Add(new OnlineRegPersonModel
                 {
                     orgid = Orgid,
@@ -691,9 +913,10 @@ namespace CmsWeb.Areas.OnlineReg.Models
                     FirstName = "Another",
                     LastName = "Person",
                     DateOfBirth = "12/1/1955",
-                    EmailAddress = "karen@touchpointsoftware.com",
+                    EmailAddress = "sombody@nowhere.com",
 #endif
                 });
+            }
         }
 
         public bool RegistrantComplete
@@ -706,11 +929,29 @@ namespace CmsWeb.Areas.OnlineReg.Models
             }
         }
 
+
+        private string selfsupportpaylink;
+        public string MissionTripSelfSupportPaylink
+        {
+            get
+            {
+                if (org != null && org.IsMissionTrip == true && (GoerId == UserPeopleId || GoerId == 0))
+                {
+                    return selfsupportpaylink ?? (selfsupportpaylink = OrgMemberModel.GetPayLink(Orgid, UserPeopleId));
+                }
+
+                return null;
+            }
+        }
+
         public void Log(string action)
         {
             int? pid = null;
             if (List.Count > 0)
+            {
                 pid = List[0].PeopleId;
+            }
+
             DbUtil.LogActivity("OnlineReg " + action, masterorgid ?? Orgid, UserPeopleId ?? pid, DatumId);
         }
 
@@ -725,5 +966,27 @@ WHERE ISNULL(abandoned, 0) = 0
 AND UserPeopleid = {0}
 AND OrganizationId = {1}", Datum.UserPeopleId, Datum.OrganizationId);
         }
+
+        internal string CheckExpiredOrCompleted()
+        {
+            var ed = DbUtil.Db.RegistrationDatas.SingleOrDefault(e => e.Id == DatumId);
+            if (ed?.Completed == true && Orgid.HasValue && !settings[Orgid.Value].AllowReRegister)
+            {
+                return "Registration Already Completed";
+            }
+
+            if (!AllowReregister && !AllowSaveProgress())
+            {
+                // Don't allow a submit to SubmitQuestions on an old form
+                var re = new Regex("index (?<dt>[0-9/]* [0-9:]* [AP]M)", RegexOptions.IgnoreCase);
+                var result = re.Match(History[0]).Groups["dt"].Value.ToDate();
+                if (result.HasValue && DateTime.Now.Subtract(result.Value).TotalMinutes > 120)
+                {
+                    return "Registration Page has expired after 2 hours";
+                }
+            }
+            return null;
+        }
+
     }
 }

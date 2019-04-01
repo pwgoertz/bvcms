@@ -11,9 +11,30 @@ namespace CmsData
         {
             return MeetingExtras.OrderBy(pp => pp.Field);
         }
+        public static MeetingExtra GetExtraValue(CMSDataContext db, int id, string field)
+        {
+            field = field.Trim();
+            var q = from v in db.MeetingExtras
+                    where v.Field == field
+                    where v.MeetingId == id
+                    select v;
+            var ev = q.SingleOrDefault();
+            if (ev == null)
+            {
+                ev = new MeetingExtra()
+                {
+                    MeetingId = id,
+                    Field =  field,
+                    TransactionTime = DateTime.Now
+                };
+                db.MeetingExtras.InsertOnSubmit(ev);
+            }
+            return ev;
+        }
         public MeetingExtra GetExtraValue(string field)
         {
-            var ev = MeetingExtras.AsEnumerable().FirstOrDefault(ee => string.Compare(ee.Field, field, ignoreCase: true) == 0);
+            field = field.Trim();
+            var ev = MeetingExtras.AsEnumerable().FirstOrDefault(ee => ee.Field == field);
             if (ev == null)
             {
                 ev = new MeetingExtra()
@@ -97,7 +118,7 @@ namespace CmsData
             return meeting;
         }
 
-        public void AddEditExtraCode(string field, string value)
+        public void AddEditExtraCode(string field, string value, string location = null)
         {
             if (!field.HasValue())
                 return;
@@ -133,7 +154,7 @@ namespace CmsData
             ev.TransactionTime = DateTime.Now;
         }
 
-        public void AddEditExtraBool(string field, bool tf)
+        public void AddEditExtraBool(string field, bool tf, string name = null, string location = null)
         {
             if (!field.HasValue())
                 return;
@@ -152,6 +173,14 @@ namespace CmsData
             ev.BitValue = bit;
             ev.UseAllValues = true;
             ev.TransactionTime = dt ?? DateTime.Now;
+        }
+        public static void AddEditExtraData(CMSDataContext db, int id, string field, string value)
+        {
+            if (!value.HasValue())
+                return;
+            var ev = GetExtraValue(db, id, field);
+            ev.Data = value;
+            ev.TransactionTime = DateTime.Now;
         }
 
         public void RemoveExtraValue(CMSDataContext db, string field)

@@ -1,29 +1,35 @@
-﻿using System;
-using System.Web.Mvc;
-using CmsData;
+﻿using CmsData;
 using CmsWeb.Areas.Dialog.Models;
+using CmsWeb.Lifecycle;
+using System;
+using System.Web.Mvc;
 
 namespace CmsWeb.Areas.Dialog.Controllers
 {
-    [RouteArea("Dialog", AreaPrefix="OrgDrop"), Route("{action}/{id?}")]
+    [RouteArea("Dialog", AreaPrefix = "OrgDrop"), Route("{action}/{id?}")]
     public class OrgDropController : CmsStaffController
     {
-        [HttpPost, Route("~/OrgDrop/{id:int}")]
-        public ActionResult Index(int id)
+        public OrgDropController(IRequestManager requestManager) : base(requestManager)
         {
-            if (id != DbUtil.Db.CurrentOrgId0)
-                throw new Exception($"Current org has changed from {id} to {DbUtil.Db.CurrentOrgId0}, aborting");
-            var model = new OrgDrop(id);
-            model.RemoveExistingLop(DbUtil.Db, id, OrgDrop.Op);
+        }
+
+        [HttpPost, Route("~/OrgDrop/{qid:guid}")]
+        public ActionResult Index(Guid qid)
+        {
+            LongRunningOperation.RemoveExisting(CurrentDatabase, qid);
+            var model = new OrgDrop(qid);
             return View(model);
         }
 
         [HttpPost]
         public ActionResult Process(OrgDrop model)
         {
-            model.UpdateLongRunningOp(DbUtil.Db, OrgDrop.Op);
+            model.UpdateLongRunningOp(CurrentDatabase, OrgDrop.Op);
             if (!model.Started.HasValue)
-                model.Process(DbUtil.Db);
+            {
+                model.Process(CurrentDatabase);
+            }
+
             return View(model);
         }
 

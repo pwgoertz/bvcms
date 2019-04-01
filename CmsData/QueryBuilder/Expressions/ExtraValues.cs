@@ -6,6 +6,7 @@
  */
 
 using System;
+using System.Data.Linq.SqlClient;
 using System.Linq;
 using System.Linq.Expressions;
 using CmsData.ExtraValue;
@@ -115,6 +116,7 @@ namespace CmsData
 
         internal Expression RecentPeopleExtraFieldChanged()
         {
+            var tf = CodeIds == "1";
             var mindt = Util.Now.AddDays(-Days).Date;
             var sev = Views.GetViewableNameTypes(db, "People", true).SingleOrDefault(nn => nn.Name == Quarters);
             if (!db.FromBatch)
@@ -126,7 +128,7 @@ namespace CmsData
                     where e.TransactionTime.Date >= mindt
                     select e).Any();
             Expression expr = Expression.Invoke(pred, parm);
-            if (op == CompareType.NotEqual)
+            if (op == CompareType.Equal ^ tf)
                 expr = Expression.Not(expr);
             return expr;
         }
@@ -231,6 +233,23 @@ namespace CmsData
                 var right = Expression.Convert(Expression.Constant(DateValue), left.Type);
                 return Compare(left, right);
             }
+        }
+        internal Expression DaysSinceExtraDate()
+        {
+            var field = Quarters;
+            Expression<Func<Person, int?>> pred = p => SqlMethods.DateDiffDay(p.PeopleExtras.SingleOrDefault(e => e.Field == field).DateValue, Util.Now.Date);
+            Expression left = Expression.Invoke(pred, parm);
+            var right = Expression.Constant(TextValue.ToInt(), typeof(int?));
+            return Compare(left, right);
+        }
+        internal Expression PeopleExtraAttr()
+        {
+            Expression<Func<Person, bool>> pred = p =>
+                db.ViewAttributes.Any(vv => vv.PeopleId == p.PeopleId && CodeStrIds.Contains(vv.FieldAttr));
+            Expression expr = Expression.Invoke(pred, parm);
+            if (op == CompareType.NotEqual || op == CompareType.NotOneOf)
+                expr = Expression.Not(expr);
+            return expr;
         }
     }
 }

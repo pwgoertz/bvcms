@@ -1,61 +1,97 @@
-﻿using System.Linq;
-using System.Web.Mvc;
-using CmsData;
+﻿using CmsData;
 using CmsWeb.Areas.Dialog.Models;
 using CmsWeb.Areas.Org.Models;
 using CmsWeb.Areas.Search.Models;
 using CmsWeb.Code;
+using CmsWeb.Lifecycle;
+using CmsWeb.Services.MeetingCategory;
+using System;
+using System.Linq;
+using System.Web.Mvc;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.Dialog.Controllers
 {
     public partial class DialogController
     {
+        private readonly IMeetingCategoryService _meetingCategoryService;
+
+        public DialogController(IRequestManager requestManager, IMeetingCategoryService meetingCategoryService) : base(requestManager)
+        {
+            _meetingCategoryService = meetingCategoryService;
+        }
+
         [HttpGet, Route("ForNewMeeting/{orgid:int}")]
         public ActionResult ForNewMeeting(int orgid)
         {
             var oi = new SettingsAttendanceModel() { Id = orgid };
             var defaultAttendCreditId = "0";
-            if(oi.Schedules.Count > 0)
+            if (oi.Schedules.Count > 0)
+            {
                 defaultAttendCreditId = oi.Schedules[0].AttendCredit.Value;
+            }
+
+            var useMeetingDescriptionPickList = CurrentDatabase.Setting("AttendanceUseMeetingCategory");
             var m = new NewMeetingInfo
             {
                 MeetingDate = oi.PrevMeetingDate,
                 Schedule = new CodeInfo(0, oi.SchedulesPrev()),
                 AttendCredit = new CodeInfo(defaultAttendCreditId, oi.AttendCreditList()),
+                DescriptionList = useMeetingDescriptionPickList ? new CodeInfo("", MeetingCategorySelectList()) : null,
+                UseMeetingDescriptionPickList = useMeetingDescriptionPickList,
+                OrganizationId = orgid
             };
             ViewBag.Action = "/CreateNewMeeting/";
             ViewBag.Method = "POST";
+            ViewBag.ForRollsheet = false;
             return View("MeetingInfo", m);
         }
 
-        [HttpGet, Route("ForNewRollsheet/{orgid:int}")]
-        public ActionResult ForNewRollsheet(int orgid)
+        private SelectList MeetingCategorySelectList()
         {
-            var oi = new SettingsAttendanceModel() { Id = orgid };
+            var list = (from m in _meetingCategoryService.GetMeetingCategories(false).OrderBy(c => c.Description)
+                        select new SelectListItem
+                        {
+                            Value = m.Description,
+                            Text = m.Description
+                        }).ToList();
+            list.Insert(0, new SelectListItem { Text = "(not specified)", Value = "" });
+
+            return new SelectList(list, dataValueField: "Value", dataTextField: "Text");
+        }
+
+        [HttpGet, Route("ForNewRollsheet/{id:guid}")]
+        public ActionResult ForNewRollsheet(Guid id)
+        {
+            var filter = CurrentDatabase.OrgFilter(id);
+            var oi = new SettingsAttendanceModel() { Id = filter.Id };
             var m = new NewMeetingInfo()
             {
-                MeetingDate =  oi.NextMeetingDate,
+                MeetingDate = oi.NextMeetingDate,
                 Schedule = new CodeInfo(0, oi.SchedulesNext()),
                 AttendCredit = new CodeInfo(0, oi.AttendCreditList()),
             };
-            ViewBag.Action = "/Reports/RollsheetForOrg/" + orgid;
+            ViewBag.Action = "/Reports/RollsheetForOrg/" + id;
             ViewBag.Method = "POST";
+            ViewBag.ForRollsheet = true;
             return View("MeetingInfo", m);
         }
 
-        [HttpGet, Route("ForNewRallyRollsheet/{orgid:int}")]
-        public ActionResult ForNewRallyRollsheet(int orgid)
+        [HttpGet, Route("ForNewRallyRollsheet/{id:guid}")]
+        public ActionResult ForNewRallyRollsheet(Guid id)
         {
-            var oi = new SettingsAttendanceModel { Id = orgid };
+            var filter = CurrentDatabase.OrgFilter(id);
+            var oi = new SettingsAttendanceModel { Id = filter.Id };
             var m = new NewMeetingInfo()
             {
-                MeetingDate =  oi.NextMeetingDate,
+                MeetingDate = oi.NextMeetingDate,
                 Schedule = new CodeInfo(0, oi.SchedulesNext()),
                 AttendCredit = new CodeInfo(0, oi.AttendCreditList()),
+                OrganizationId = filter.Id
             };
-            ViewBag.Action = "/Reports/RallyRollsheetForOrg/" + orgid;
+            ViewBag.Action = "/Reports/RallyRollsheetForOrg/" + filter.Id;
             ViewBag.Method = "POST";
+            ViewBag.ForRollsheet = false;
             return View("MeetingInfo", m);
         }
 
@@ -64,10 +100,11 @@ namespace CmsWeb.Areas.Dialog.Controllers
         {
             var m = new NewMeetingInfo()
             {
-                MeetingDate =  OrgSearchModel.DefaultMeetingDate(schedule),
+                MeetingDate = OrgSearchModel.DefaultMeetingDate(schedule),
                 Schedule = null,
                 AttendCredit = null
             };
+            ViewBag.ForRollsheet = true;
             return View("MeetingInfo", m);
         }
 
@@ -76,10 +113,11 @@ namespace CmsWeb.Areas.Dialog.Controllers
         {
             var m = new NewMeetingInfo()
             {
-                MeetingDate =  OrgSearchModel.DefaultMeetingDate(schedule),
+                MeetingDate = OrgSearchModel.DefaultMeetingDate(schedule),
                 Schedule = null,
                 AttendCredit = null,
             };
+            ViewBag.ForRollsheet = false;
             return View("MeetingInfo", m);
         }
 
@@ -87,28 +125,37 @@ namespace CmsWeb.Areas.Dialog.Controllers
         public ActionResult CreateNewMeeting(NewMeetingInfo model)
         {
             if (!ModelState.IsValid)
+            {
+                ViewBag.ForRollsheet = false;
                 return View("MeetingInfo", model);
-            var organization = DbUtil.Db.LoadOrganizationById(Util2.CurrentOrganization.Id);
+            }
+            var organization = CurrentDatabase.LoadOrganizationById(model.OrganizationId);
             if (organization == null)
+            {
                 return Content("error: no org");
-            var mt = DbUtil.Db.Meetings.SingleOrDefault(m => m.MeetingDate == model.MeetingDate
+            }
+
+            var mt = CurrentDatabase.Meetings.SingleOrDefault(m => m.MeetingDate == model.MeetingDate
                     && m.OrganizationId == organization.OrganizationId);
 
             if (mt != null)
+            {
                 return Redirect("/Meeting/" + mt.MeetingId);
+            }
 
             mt = new Meeting
             {
                 CreatedDate = Util.Now,
                 CreatedBy = Util.UserId1,
+                Description = Request["DescriptionList.Value"] ?? Request["Description"],
                 OrganizationId = organization.OrganizationId,
                 GroupMeetingFlag = model.ByGroup,
                 Location = organization.Location,
                 MeetingDate = model.MeetingDate,
                 AttendCreditId = model.AttendCredit.Value.ToInt()
             };
-            DbUtil.Db.Meetings.InsertOnSubmit(mt);
-            DbUtil.Db.SubmitChanges();
+            CurrentDatabase.Meetings.InsertOnSubmit(mt);
+            CurrentDatabase.SubmitChanges();
             DbUtil.LogActivity($"Creating new meeting for {organization.OrganizationName}");
             return Redirect("/Meeting/" + mt.MeetingId);
         }

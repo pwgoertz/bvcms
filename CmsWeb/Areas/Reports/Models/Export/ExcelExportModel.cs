@@ -1,17 +1,25 @@
+using CmsData;
+using CmsData.API;
+using OfficeOpenXml;
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Dynamic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
-using CmsData;
-using OfficeOpenXml;
 using UtilityExtensions;
+using DirectoryInfo = CmsWeb.Areas.Reports.Models.DirectoryInfo;
 
 namespace CmsWeb.Models
 {
     public static class ExcelExportModel
     {
+        public static void SaveAs(this DataTable dt, string filename = "People.xlsx", bool useTable = false)
+        {
+            var ep = new ExcelPackage();
+            ep.AddSheet(dt, filename, useTable);
+            ep.SaveAs(new FileInfo(filename));
+        }
         public static EpplusResult ToExcel(this DataTable dt, string filename = "People.xlsx", bool useTable = false)
         {
             var ep = new ExcelPackage();
@@ -22,7 +30,9 @@ namespace CmsWeb.Models
         {
             DataTable dt;
             if (fromSql)
+            {
                 dt = rd.DataReaderToTable();
+            }
             else
             {
                 dt = new DataTable();
@@ -36,12 +46,18 @@ namespace CmsWeb.Models
             var dataTable = new DataTable(typeof(T).Name);
             var props = typeof(T).GetProperties(BindingFlags.Public | BindingFlags.Instance);
             foreach (var prop in props)
+            {
                 dataTable.Columns.Add(prop.Name);
+            }
+
             foreach (var item in items)
             {
                 var values = new object[props.Length];
                 for (var i = 0; i < props.Length; i++)
+                {
                     values[i] = props[i].GetValue(item, null);
+                }
+
                 dataTable.Rows.Add(values);
             }
             return dataTable;
@@ -49,26 +65,47 @@ namespace CmsWeb.Models
         public static IEnumerable<dynamic> AsEnumerable(this ExcelPackage package)
         {
             var ws = package.Workbook.Worksheets.First();
-            var header = ws.Cells[1, 1, 1, ws.Dimension.End.Column];
+            return ws.AsEnumerable();
+        }
+        public static IEnumerable<dynamic> AsEnumerable(this ExcelWorksheet ws)
+        {
+            var header = ws.GetHeaderColumns();
             var r = 2;
             while (r <= ws.Dimension.End.Row)
             {
-                var row = ws.Cells[r, 1, r, ws.Dimension.End.Column];
-                var record = new ExpandoObject() as IDictionary<string, object>;
-                for (var c = 1; c < header.Columns; c++)
-                    record.Add(header[1, c].Text, row[1, c].Value);
+                var dict = new Dictionary<string, object>();
+                foreach (var kv in header)
+                {
+                    dict[kv.Key] = ws.Cells[r, kv.Value].Value;
+                }
+
+                var record = new DynamicData(dict);
                 r++;
                 yield return record;
             }
         }
+        public static Dictionary<string, int> GetHeaderColumns(this ExcelWorksheet sheet)
+        {
+            var names = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var n = 0;
+            foreach (var c in sheet.Cells[1, 1, 1, sheet.Dimension.End.Column])
+            {
+                n++;
+                if (c.Text.HasValue())
+                {
+                    names.Add(c.Text, n);
+                }
+            }
+            return names;
+        }
 
         public static List<ExcelPic> List(Guid queryid)
         {
-            var Db = DbUtil.Db;
-            var query = Db.PeopleQuery(queryid);
+            //var Db = Db;
+            var query = DbUtil.Db.PeopleQuery(queryid);
             var q = from p in query
                     let om = p.OrganizationMembers.SingleOrDefault(om => om.OrganizationId == p.BibleFellowshipClassId)
-                    let spouse = Db.People.Where(pp => pp.PeopleId == p.SpouseId).Select(pp => pp.PreferredName).SingleOrDefault()
+                    let spouse = DbUtil.Db.People.Where(pp => pp.PeopleId == p.SpouseId).Select(pp => pp.PreferredName).SingleOrDefault()
                     let familyname = p.Family.People
                                 .Where(pp => pp.PeopleId == pp.Family.HeadOfHouseholdId)
                                 .Select(pp => pp.LastName).SingleOrDefault()
@@ -85,7 +122,9 @@ namespace CmsWeb.Models
                         State = p.PrimaryState,
                         Zip = p.PrimaryZip.FmtZip(),
                         Email = p.EmailAddress,
-                        BirthDate = p.BirthMonth + "/" + p.BirthDay + "/" + p.BirthYear,
+                        BMon = p.BirthMonth,
+                        BYear = p.BirthYear,
+                        BDay = p.BirthDay,
                         BirthDay = " " + p.BirthMonth + "/" + p.BirthDay,
                         Anniversary = " " + p.WeddingDate.Value.Month + "/" + p.WeddingDate.Value.Day,
                         JoinDate = p.JoinDate.FormatDate(),
@@ -105,13 +144,57 @@ namespace CmsWeb.Models
                                         ? cc.PreferredName
                                         : cc.Name
                                     )),
-                        Age = p.Age.ToString(),
+                        Age = Person.AgeDisplay(p.Age, p.PeopleId).ToString(),
                         School = p.SchoolOther,
                         Grade = p.Grade.ToString(),
                         AttendPctBF = (om == null ? 0 : om.AttendPct == null ? 0 : om.AttendPct.Value),
                         Married = p.MaritalStatus.Description,
                         FamilyId = p.FamilyId,
                         ImageId = p.Picture.LargeId,
+                    };
+            return q.Take(10000).ToList();
+        }
+        public static List<DirectoryInfo> DirectoryList(Guid queryid)
+        {
+            //var db = Db;
+            var query = DbUtil.Db.PeopleQuery(queryid);
+            var q = from p in query
+                    let spouse = DbUtil.Db.People.SingleOrDefault(pp => pp.PeopleId == p.SpouseId)
+                    let familytitle =
+                        p.Family.FamilyExtras.Where(mm => mm.Field == "FamilyName" && mm.Data != null)
+                            .Select(mm => mm.Data)
+                            .SingleOrDefault()
+                    let familyname = familytitle ?? p.Family.People
+                        .Where(pp => pp.PeopleId == pp.Family.HeadOfHouseholdId)
+                        .Select(pp => pp.LastName).SingleOrDefault()
+                    let couplename = DbUtil.Db.FamilyExtras.SingleOrDefault(ff => ff.FamilyId == p.FamilyId && ff.Field == "CoupleName").Data
+                    orderby familyname, p.FamilyId, p.Name2
+                    select new DirectoryInfo()
+                    {
+                        Person = p,
+                        SpouseFirst = spouse.PreferredName,
+                        SpouseLast = spouse.LastName,
+                        SpouseEmail = spouse.EmailAddress,
+                        SpouseCellPhone = spouse.CellPhone,
+                        SpouseDoNotPublishPhone = spouse.DoNotPublishPhones,
+                        Children = p.PositionInFamilyId != 10 ? ""
+                            : string.Join(", ", (from cc in p.Family.People
+                                                 where cc.PositionInFamilyId == 30
+                                                 //where cc.Age <= 18
+                                                 select cc.LastName == familyname
+                                                         ? cc.PreferredName
+                                                         : cc.Name).ToList()),
+                        FamilyTitle = familytitle ?? ("The " + p.Name + " Family"),
+                        ImageId = p.Picture.LargeId,
+                        FamImageId = p.Family.Picture.LargeId,
+                        CoupleName = couplename,
+                        ChildrenAges = p.PositionInFamilyId != 10
+                            ? ""
+                            : string.Join("~", p.Family.People
+                                .Where(cc => cc.PositionInFamilyId > 10)
+                                .Select(cc =>
+                                    $"{(cc.LastName == familyname ? cc.PreferredName : cc.Name)}|{Person.AgeDisplay(cc.Age, cc.PeopleId)}|{cc.BirthMonth}|{cc.BirthDay}"
+                                )),
                     };
             return q.Take(10000).ToList();
         }
@@ -174,7 +257,7 @@ namespace CmsWeb.Models
                 ws.Cells[r, c++].Value = ep.MemberStatus;
                 ws.Cells[r, c++].Value = ep.FellowshipLeader;
                 ws.Cells[r, c++].Value = ep.Spouse;
-                ws.Cells[r, c++].Value = ep.Age;
+                ws.Cells[r, c++].Value = Person.AgeDisplay(ep.Age, ep.PeopleId);
                 ws.Cells[r, c++].Value = ep.Grade;
                 ws.Cells[r, c++].Value = ep.AttendPctBF;
                 ws.Cells[r, c++].Value = ep.Married;

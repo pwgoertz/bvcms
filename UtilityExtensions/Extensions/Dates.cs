@@ -17,7 +17,6 @@ namespace UtilityExtensions
 {
     public static partial class Util
     {
-        private const string STR_NOWOFFSET = "NOWOFFSET";
         public const int SignalNoYear = 1897;
         private static DateTime? GoodDate(DateTime? dt)
         {
@@ -37,6 +36,16 @@ namespace UtilityExtensions
             if (td.Month < bd.Month || (td.Month == bd.Month && td.Day < bd.Day))
                 age--;
             return age.ToString();
+        }
+        public static int Age0(this DateTime? bd)
+        {
+            if (bd == null)
+                return -1;
+            DateTime td = Now;
+            int age = td.Year - bd.Value.Year;
+            if (td.Month < bd.Value.Month || (td.Month == bd.Value.Month && td.Day < bd.Value.Day))
+                age--;
+            return age;
         }
         public static int Age0(this string birthday)
         {
@@ -61,25 +70,64 @@ namespace UtilityExtensions
                 age--;
             return age;
         }
-        private const string STR_DateTimeNow = "DateTimeNow";
+        private const string StrDateSimulation = "DateSimulation";
+        public static bool DateSimulation
+        {
+            get
+            {
+                bool? sim = false;
+                if (HttpContextFactory.Current != null)
+                {
+                    if (HttpContextFactory.Current != null)
+                        if (HttpContextFactory.Current.Items[StrDateSimulation] != null)
+                            sim = (bool)HttpContextFactory.Current.Items[StrDateSimulation];
+                }
+                return sim ?? false;
+            }
+            set
+            {
+                if (HttpContextFactory.Current == null)
+                    return;
+                HttpContextFactory.Current.Items[StrDateSimulation] = value;
+            }
+        }
+        private const string StrToday = "StrToday";
         public static DateTime Now
         {
             get
             {
-#if DEBUG2
-                //return DateTime.Now.Add(new TimeSpan(3, 5, 5, 0));
-                var o = HttpRuntime.Cache[STR_DateTimeNow];
-                return o != null ? (DateTime) o : DateTime.Now;
-#else
-                return DateTime.Now;
-#endif
+                var now = DateTime.Now;
+                if (!DateSimulation)
+                    return now;
+                if (HttpContextFactory.Current == null)
+                    return now;
+                if (HttpContextFactory.Current.Session[StrToday] != null)
+                    now = (DateTime)HttpContextFactory.Current.Session[StrToday];
+                return now.Date.Add(DateTime.Now.TimeOfDay);
             }
-#if DEBUG
+        }
+        public static DateTime Today
+        {
+            get
+            {
+                var now = DateTime.Today;
+                if (!DateSimulation)
+                    return now;
+                if (HttpContextFactory.Current == null)
+                    return now;
+                if (HttpContextFactory.Current.Session[StrToday] != null)
+                    now = (DateTime)HttpContextFactory.Current.Session[StrToday];
+                return now.Date;
+            }
             set
             {
-                HttpRuntime.Cache[STR_DateTimeNow] = value;
+                HttpContextFactory.Current.Session[StrToday] = value;
             }
-#endif
+        }
+
+        public static void ResetToday()
+        {
+            HttpContextFactory.Current.Session.Remove(StrToday);
         }
         public static bool DateValid(string dt)
         {
@@ -105,7 +153,7 @@ namespace UtilityExtensions
             return false;
         }
         public static bool BirthDateValid(string dob, out DateTime dt2)
-        {
+        {           
             dt2 = DateTime.MinValue;
             if (DateTime.TryParseExact(dob, "m", CultureInfo.CurrentCulture, DateTimeStyles.None, out dt2))
             {
@@ -119,11 +167,11 @@ namespace UtilityExtensions
             dt2 = DateTime.MinValue;
             if (!bmon.HasValue || !bday.HasValue) // year is not required
                 return false;
-            var s = FormatBirthday(byear, bmon, bday);
+            var s = FmtBirthday(byear, bmon, bday);
             if (!DateValid(s, out dt2))
                 return false;
             dt2 = new DateTime(byear ?? SignalNoYear, bmon.Value, bday.Value);
-            if (dt2 > DateTime.Now)
+            if (dt2 > Util.Now)
                 dt2 = dt2.AddYears(-100);
             return true;
         }
@@ -142,7 +190,7 @@ namespace UtilityExtensions
         public static DateTime SundayForWeek(int year, int weekNum)
         {
             var firstSunday = Sunday(1, year);
-            var result = firstSunday.AddDays((weekNum-1) * 7);
+            var result = firstSunday.AddDays((weekNum - 1) * 7);
             return result;
         }
 
@@ -208,6 +256,17 @@ namespace UtilityExtensions
 
             return null;
         }
+        public static DateTime? ParseyyyyMMdd(string s)
+        {
+            if (s == null || s.Length != 8)
+                return null;
+            DateTime dt;
+            if (DateTime.TryParseExact(s, "yyyyMMdd",
+                    CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal,
+                    out dt))
+                return dt;
+            return null;
+        }
         public static string BuildDate()
         {
             return GetBuildDate().FormatDateTm();
@@ -215,7 +274,7 @@ namespace UtilityExtensions
 
         public static DateTime GetNextDayOfWeek(this DateTime start, DayOfWeek nextDayOfWeek)
         {
-            var daysToAdd = ((int) nextDayOfWeek - (int) start.DayOfWeek + 7) % 7;
+            var daysToAdd = ((int)nextDayOfWeek - (int)start.DayOfWeek + 7) % 7;
             return start.AddDays(daysToAdd);
         }
 

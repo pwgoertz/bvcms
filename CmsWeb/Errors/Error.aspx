@@ -1,4 +1,5 @@
-﻿<%@ Page Language="C#" AutoEventWireup="true" %>
+﻿<% Response.StatusCode = 500; %>
+<%@ Page Language="C#" AutoEventWireup="true" %>
 <%@ Import Namespace="System.Security.Cryptography" %>
 <%@ Import Namespace="System.Threading" %>
 <script runat="server">
@@ -43,14 +44,14 @@
         <span class="hr"></span>
         <br>
         SOMETHING IS NOT QUITE RIGHT<br/>
-        <%=HttpContext.Current.Items["error"] %>
+        <%=HttpContextFactory.Current.Items["error"] %>
         <br>
         <span class="solve">It seems you stumbled on something that doesn't work very well. If this problem persists, please kindly let us know.
             Thanks!</span>
     </div>
     <div id="footer" class="container-fluid hidden-print">
         <div class="text-center">
-            &copy; 2015 TouchPoint Software, LLC.
+            &copy; <%=DateTime.Today.Year %> <%=Resource1.CompanyName %>
         </div>
     </div>
     <script src='//ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js'></script>

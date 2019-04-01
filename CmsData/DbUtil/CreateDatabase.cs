@@ -11,6 +11,8 @@ using System.Web;
 using UtilityExtensions;
 using System.Web.Caching;
 using System.Data.SqlClient;
+using Dapper;
+using System.Linq;
 
 namespace CmsData
 {
@@ -147,7 +149,7 @@ GO
         }
         public static string CreateDatabase()
         {
-            var server = HttpContext.Current.Server;
+            var server = HttpContextFactory.Current.Server;
             var path = server.MapPath("/");
             var sqlScriptsPath = path + @"..\SqlScripts\";
             var cs = Util.GetConnectionString2("master");
@@ -161,9 +163,9 @@ GO
             return retVal;
         }
 
+        static string currentFile;
         public static string CreateDatabase(string hostName, string sqlScriptsPath, string masterConnectionString, string imageConnectionString, string elmahConnectionString, string standardConnectionString)
         {
-            var currentFile = string.Empty;
             try
             {
                 RunScripts(masterConnectionString, "create database CMS_" + hostName);
@@ -210,6 +212,17 @@ GO
 
                     var datazips = File.ReadAllText(sqlScriptsPath + "datazips.sql");
                     RunScripts(cn, datazips);
+
+                    var migrationsFolder = Path.GetFullPath(Path.Combine(sqlScriptsPath, @"..\CmsData\Migrations"));
+                    if (Directory.Exists(migrationsFolder))
+                    {
+                        currentFile = migrationsFolder;
+                        RunMigrations(cn, migrationsFolder);
+                    }
+                    else
+                    {
+                        throw new DirectoryNotFoundException(migrationsFolder + " was not found");
+                    }
                 }
             }
             catch (Exception ex)
@@ -220,7 +233,26 @@ GO
             return null;
         }
 
-        private static void RunScripts(string cs, string script)
+        public static void RunMigrations(SqlConnection connection, string migrationsFolder)
+        {
+            var files = new DirectoryInfo(migrationsFolder).EnumerateFiles();
+            var applied = connection.Query<string>(
+                "IF EXISTS (SELECT 1 FROM sys.tables WHERE name = '__SqlMigrations') SELECT Id FROM dbo.__SqlMigrations"
+                ).ToList();
+            foreach (var f in files)
+            {
+                var fileName = f.Name;
+                if (!applied.Contains(fileName))
+                {
+                    currentFile = f.FullName;
+                    var script = File.ReadAllText(currentFile);
+                    RunScripts(connection, script);
+                    connection.Execute("INSERT INTO dbo.__SqlMigrations (Id) VALUES(@fileName)", new { fileName });
+                }
+            }
+        }
+
+        public static void RunScripts(string cs, string script)
         {
             using (var cn = new SqlConnection(cs))
             {
@@ -229,14 +261,14 @@ GO
             }
         }
 
-        private static void RunScripts(SqlConnection cn, string script)
+        public static void RunScripts(SqlConnection cn, string script)
         {
-            using (var cmd = new SqlCommand {Connection = cn})
+            using (var cmd = new SqlCommand { Connection = cn, CommandTimeout = 0 })
             {
-                var scripts = Regex.Split(script, "^GO.*$", RegexOptions.Multiline);
+                var scripts = Regex.Split(script, "^GO.*$", RegexOptions.Multiline | RegexOptions.IgnoreCase);
                 foreach (var s in scripts)
                 {
-                    if (s.HasValue())
+                    if (s.Trim().HasValue())
                     {
                         cmd.CommandText = s;
                         cmd.ExecuteNonQuery();

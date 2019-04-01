@@ -243,7 +243,8 @@
             prevChecked = this;
         }
         var a = pids.map(function () { return $(this).val(); }).get();
-        $.post("/Org/ToggleCheckboxes/{0}".format($("#Id").val()), {
+        var url = "/Org/ToggleCheckboxes/" + $("#QueryId").val();
+        $.post(url, {
             pids: a,
             chkd: prevChecked.checked
         });
@@ -263,7 +264,11 @@
         function () {
             $.block();
             $.post(href, null, function (ret) {
-                if (ret != "ok") {
+                if (ret.startsWith("error")) {
+                    $.unblock();
+                    swal("Error!", ret, "error");
+                }
+                else if (ret !== "ok") {
                     $.unblock();
                     window.location = ret;
                 }

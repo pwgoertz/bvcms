@@ -1,9 +1,10 @@
-﻿using System.Linq;
-using System.Web.Mvc;
-using CmsData;
+﻿using CmsData;
 using CmsWeb.MobileAPI;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Web.Mvc;
 
 namespace CmsWeb.Areas.Public.Controllers
 {
@@ -105,11 +106,13 @@ namespace CmsWeb.Areas.Public.Controllers
                           where p.Enabled == true
                           where s.Active == true
                           where p.Api <= dataIn.version
+                          where p.Active <= DateTime.Now
                           orderby p.Order
                           select new MobileHomeAction
                           {
                               type = p.Type,
                               title = p.Title,
+                              altTitle = p.AltTitle,
                               option = p.Option,
                               data = p.Data,
                               icon = i.Url,

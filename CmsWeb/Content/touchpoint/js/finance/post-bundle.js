@@ -27,9 +27,9 @@
             }
             pid = personId;
 
-            $('#name').val($("td.name a", tr).text());
-            $('#checkno').val($("td.checkno a", tr).text());
-            $('#notes').val($("td.notes span", tr).text());
+            $('#name').val($("td.name a", tr).text().trim());
+            $('#checkno').val($("td.checkno a", tr).text().trim());
+            $('#notes').val($("td.notes span", tr).text().trim());
             $('#amt').focus();
             $(this).val($.trim(pid));
             return true;
@@ -67,7 +67,7 @@
     $("#name").autocomplete({
         appendTo: "#SearchResults2",
         autoFocus: true,
-        minLength: 3,
+        minLength: 1,
         source: function (request, response) {
             if ($("#moreresults").is(":checked")) {
                 $.post("/PostBundle/Names2", request, function (ret) {
@@ -194,8 +194,9 @@
         }
 
         $('#pid').val(personId);
-        $('#name').val($("td.name a", tr).text());
+        $('#name').val($(".name", tr).text().trim());
         $('#contributiondate').val($(".date", tr).val());
+        $('#campusid').val($(".campusid", tr).val());
         $("#gear").show();
         $('#fund').val($("td.fund", tr).attr('val'));
 
@@ -466,11 +467,29 @@
         $("#contributiondate").val($("#newcontributiondate").val());
         $('#edit-date-modal').modal('hide');
     });
+
+    $("#showcampus").click(function (ev) {
+        ev.preventDefault();
+        $('#edit-campus-modal').modal('show');
+    });
+
+    $('#edit-campus-modal').on('shown.bs.modal', function () {
+        $("#newcampus").val($("#campusid").val()).focus();
+        $.InitializeDateElements();
+    });
+
+    $("#editcampusdone").click(function (ev) {
+        ev.preventDefault();
+        $("#campusid").val($("#newcampus").val());
+        $('#edit-campus-modal').modal('hide');
+    });
+
 });
 
 function AddSelected(ret) {
     var tr = $('tr[cid=' + ret.cid + ']');
-    $('a.pid', tr).text(ret.pid);
-    $('td.name a', tr).text(ret.name);
-    $('a.edit', tr).click();
+    $('.pid', tr).text(ret.pid);
+    $('.name', tr).text(ret.name);
+
+    $('.edit', tr).click();
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using CmsData.Codes;
 using UtilityExtensions;
 
 namespace CmsData
@@ -12,6 +13,15 @@ namespace CmsData
             var q = Queries.SingleOrDefault(cc => cc.QueryId == id);
             return q;
         }
+        public Guid ScratchPadQuery(string code)
+        {
+            var c = ScratchPadCondition();
+            var cc = Condition.Parse(code, c.Id);
+            cc.ConditionName = c.ConditionName;
+            cc.Save(this);
+            return cc.Id;
+        }
+
         public Condition ScratchPadCondition()
         {
             Condition c;
@@ -29,8 +39,8 @@ namespace CmsData
                 {
                     QueryId = c.Id,
                     Owner = Util.UserName,
-                    Created = DateTime.Now,
-                    LastRun = DateTime.Now,
+                    Created = Util.Now,
+                    LastRun = Util.Now,
                     Name = Util.ScratchPad2,
                     Text = c.ToXml()
                 };
@@ -64,8 +74,8 @@ namespace CmsData
                 {
                     QueryId = c.Id,
                     Owner = STR_System,
-                    Created = DateTime.Now,
-                    LastRun = DateTime.Now,
+                    Created = Util.Now,
+                    LastRun = Util.Now,
                     Name = name,
                     Text = c.ToXml()
                 };
@@ -90,10 +100,6 @@ namespace CmsData
         {
             return StandardQuery("HasCurrentTag", QueryType.HasCurrentTag);
         }
-        public Query QueryInCurrentOrg()
-        {
-            return StandardQuery("InCurrentOrg", QueryType.InCurrentOrg);
-        }
         public Query QueryLeadersUnderCurrentOrg()
         {
             return StandardQuery("LeadersUnderCurrentOrg", QueryType.LeadersUnderCurrentOrg);
@@ -102,6 +108,32 @@ namespace CmsData
         {
             return StandardQuery("MembersUnderCurrentOrg", QueryType.MembersUnderCurrentOrg);
         }
+        public OrgFilter NewOrgFilter(int orgid)
+        {
+            var c = Condition.CreateNewGroupClause();
+            c.AddNewClause(QueryType.OrgFilter, CompareType.Equal, "1,True");
+            var qb = new Query
+            {
+                QueryId = c.Id,
+                Owner = "system",
+                Created = DateTime.Now,
+                LastRun = DateTime.Now,
+                Name = "OrgFilter",
+                Text = c.ToXml()
+            };
+            Queries.InsertOnSubmit(qb);
+            var filter = new OrgFilter
+            {
+                GroupSelect = GroupSelectCode.Member,
+                Id = orgid,
+                QueryId = c.Id,
+                LastUpdated = DateTime.Now,
+            };
+            OrgFilters.InsertOnSubmit(filter);
+            SubmitChanges();
+            return filter;
+        }
+
         public List<Query> FetchLastFiveQueries()
         {
             var q = from cc in Queries
@@ -119,8 +151,8 @@ namespace CmsData
                 {
                     QueryId = c.Id,
                     Owner = Util.UserName,
-                    Created = DateTime.Now,
-                    LastRun = DateTime.Now,
+                    Created = Util.Now,
+                    LastRun = Util.Now,
                     Text = c.ToXml()
                 };
                 Queries.InsertOnSubmit(query);
@@ -145,8 +177,8 @@ namespace CmsData
                 {
                     QueryId = c.Id,
                     Owner = Util.UserName,
-                    Created = DateTime.Now,
-                    LastRun = DateTime.Now,
+                    Created = Util.Now,
+                    LastRun = Util.Now,
                     Name = Util.ScratchPad2,
                     Text = c.ToXml()
                 };
@@ -173,7 +205,7 @@ namespace CmsData
                      where existing.QueryId == existingId
                      select existing).First();
             i.RunCount = i.RunCount + 1;
-            i.LastRun = DateTime.Now;
+            i.LastRun = Util.Now;
             if (i.Name == Util.ScratchPad2)
                 return i.ToClause();
             var q = ScratchPadCondition().JustLoadedQuery;
@@ -196,7 +228,7 @@ namespace CmsData
             qb.Reset();
             var nc = qb.AddNewClause();
             qb.Description = Util.ScratchPad2;
-            qb.Save(DbUtil.Db);
+            qb.Save(this);
             return qb.Id;
         }
         public Query QueryInactiveCurrentOrg()

@@ -1,7 +1,7 @@
-﻿using System;
+﻿using CmsData;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using CmsData;
 using UtilityExtensions;
 
 namespace CmsWeb.MobileAPI
@@ -13,6 +13,7 @@ namespace CmsWeb.MobileAPI
 
         public string first { get; set; }
         public string last { get; set; }
+        public string alt { get; set; }
         public string suffix { get; set; }
 
         public string gender { get; set; }
@@ -47,12 +48,17 @@ namespace CmsWeb.MobileAPI
 
             first = p.PreferredName ?? "";
             last = p.LastName ?? "";
+            alt = p.AltName ?? "";
             suffix = p.SuffixCode;
 
             if (p.AddressTypeId == 10)
+            {
                 primaryAddress = "Family";
+            }
             else
+            {
                 primaryAddress = "Personal";
+            }
 
             var familyAddr = new MobilePersonAddress();
             familyAddr.address1 = p.Family.AddressLineOne ?? "";
@@ -76,23 +82,33 @@ namespace CmsWeb.MobileAPI
             }
 
             gender = p.Gender.Description;
-            age = p.Age ?? 0;
+            age = Person.AgeDisplay(p.Age, p.PeopleId) ?? 0;
             birthday = p.DOB.Length > 0 ? p.DOB : "No Birthday Set";
 
             if (!string.IsNullOrEmpty(p.CellPhone))
+            {
                 emailPhone.Add(new MobileContact(1, "Cell", p.CellPhone.FmtFone()));
+            }
 
             if (!string.IsNullOrEmpty(p.HomePhone))
+            {
                 emailPhone.Add(new MobileContact(1, "Home", p.HomePhone.FmtFone()));
+            }
 
             if (!string.IsNullOrEmpty(p.WorkPhone))
+            {
                 emailPhone.Add(new MobileContact(1, "Work", p.WorkPhone.FmtFone()));
+            }
 
             if (!string.IsNullOrEmpty(p.EmailAddress))
+            {
                 emailPhone.Add(new MobileContact(2, "EMail1", p.EmailAddress));
+            }
 
             if (!string.IsNullOrEmpty(p.EmailAddress2))
+            {
                 emailPhone.Add(new MobileContact(2, "EMail2", p.EmailAddress2));
+            }
 
             status = p.MemberStatusId;
             statusText = p.MemberStatus.Description;
@@ -104,7 +120,7 @@ namespace CmsWeb.MobileAPI
                 var familyMember = new MobileFamilyMember();
                 familyMember.id = m.PeopleId.ToString();
                 familyMember.name = m.Name;
-                familyMember.age = m.Age.ToString();
+                familyMember.age = Person.AgeDisplay(m.Age, m.PeopleId).ToString();
                 familyMember.gender = m.Gender.Description;
                 familyMember.position = m.FamilyPosition.Description;
                 familyMember.deceased = m.Deceased;
@@ -119,8 +135,10 @@ namespace CmsWeb.MobileAPI
 
             foreach (var rf in q)
             {
-                if(!relatives.ContainsKey(rf.hohid.ToString()))
-    				relatives.Add(rf.hohid.ToString(), rf.description);
+                if (!relatives.ContainsKey(rf.hohid.ToString()))
+                {
+                    relatives.Add(rf.hohid.ToString(), rf.description);
+                }
             }
 
             picture = "";

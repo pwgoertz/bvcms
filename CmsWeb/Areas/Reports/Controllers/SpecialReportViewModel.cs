@@ -17,9 +17,10 @@ namespace CmsWeb.Areas.Reports.Controllers
         public string Name { get; set; }
         public string Name2 { get; set; }
         public Guid Id { get; set; }
+        public int? Qtagid { get; set; }
         public string Results { get; set; }
         public string ExcelUrl => $"/Reports/SqlReportExcel/{Report}/{Id}";
-
+        public SpecialReportViewModel() { }
         public SpecialReportViewModel(string report, Guid id)
         {
             Report = report;
@@ -32,7 +33,7 @@ namespace CmsWeb.Areas.Reports.Controllers
             DynamicParameters p;
             var content = GetParameters(out p);
 
-            var cs = HttpContext.Current.User.IsInRole("Finance")
+            var cs = HttpContextFactory.Current.User.IsInRole("Finance")
                 ? Util.ConnectionStringReadOnlyFinance
                 : Util.ConnectionStringReadOnly;
             using (var cn = new SqlConnection(cs))
@@ -46,7 +47,7 @@ namespace CmsWeb.Areas.Reports.Controllers
         {
             DynamicParameters p;
             var content = GetParameters(out p);
-            var cs = HttpContext.Current.User.IsInRole("Finance")
+            var cs = HttpContextFactory.Current.User.IsInRole("Finance")
                 ? Util.ConnectionStringReadOnlyFinance
                 : Util.ConnectionStringReadOnly;
             using (var cn = new SqlConnection(cs))
@@ -65,19 +66,27 @@ namespace CmsWeb.Areas.Reports.Controllers
                 throw new Exception("Not Authorized to run this script");
 
             var hasqtag = content.Contains("@qtagid");
+            var hasbtbtag = content.Contains("@BlueToolbarTagId");
             var hascurrentorg = content.Contains("@CurrentOrgId");
-            if (!hasqtag && !hascurrentorg)
-                throw new Exception("missing @qtagid or @CurrentOrgId");
+            if (!hasqtag && !hascurrentorg && !hasbtbtag)
+                throw new Exception("missing @qtagid or @CurrentOrgId or @BlueToolbarTagId");
 
             p = new DynamicParameters();
             if (hasqtag)
             {
                 var tag = DbUtil.Db.PopulateSpecialTag(Id, DbUtil.TagTypeId_Query);
                 p.Add("@qtagid", tag.Id);
+                Qtagid = tag.Id;
+            }
+            if (hasbtbtag)
+            {
+                var tag = DbUtil.Db.PopulateSpecialTag(Id, DbUtil.TagTypeId_Query);
+                p.Add("@BlueToolbarTagId", tag.Id);
+                Qtagid = tag.Id;
             }
             if (hascurrentorg)
             {
-                var oid = DbUtil.Db.CurrentOrgId0;
+                var oid = DbUtil.Db.CurrentSessionOrgId;
                 p.Add("@CurrentOrgId", oid);
                 if (oid > 0)
                     Name2 = DbUtil.Db.LoadOrganizationById(oid).FullName2;
@@ -103,8 +112,8 @@ namespace CmsWeb.Areas.Reports.Controllers
             var pe = new PythonModel(Util.Host);
 
             pe.DictionaryAdd("BlueToolbarGuid", Id.ToCode());
-            foreach (var key in HttpContext.Current.Request.QueryString.AllKeys)
-                pe.DictionaryAdd(key, HttpContext.Current.Request.QueryString[key]);
+            foreach (var key in HttpContextFactory.Current.Request.QueryString.AllKeys)
+                pe.DictionaryAdd(key, HttpContextFactory.Current.Request.QueryString[key]);
 
             pe.RunScript(content);
             Results = pe.Output;
@@ -115,9 +124,9 @@ namespace CmsWeb.Areas.Reports.Controllers
             if (!script.StartsWith("#Roles=") && !script.StartsWith("--Roles"))
                 return true;
             var re = new Regex("(--|#)Roles=(?<roles>.*)", RegexOptions.IgnoreCase);
-            var roles = re.Match(script).Groups["roles"].Value.Split(',').Select(aa => aa.Trim());
-            if (!roles.Any(rr => HttpContext.Current.User.IsInRole(rr)))
-                return false;
+            var roles = re.Match(script).Groups["roles"].Value.Split(',').Select(aa => aa.Trim()).ToArray();
+            if (roles.Length > 0)
+                return roles.Any(rr => HttpContextFactory.Current.User.IsInRole(rr));
             return true;
         }
     }

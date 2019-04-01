@@ -1,13 +1,13 @@
+using CmsData;
+using CmsData.API;
+using CmsData.Registration;
+using CmsData.View;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mail;
 using System.Text;
 using System.Text.RegularExpressions;
-using CmsData;
-using CmsData.API;
-using CmsData.Registration;
-using CmsData.View;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.OnlineReg.Models
@@ -27,19 +27,29 @@ namespace CmsWeb.Areas.OnlineReg.Models
             AddPeopleToTransaction();
 
             if (masterorgid.HasValue)
+            {
                 return EnrollAndConfirmMultipleOrgs();
+            }
 
             if (SupportMissionTrip && TotalAmount() > 0)
+            {
+                List[0].Enroll(Transaction, List[0].GetPayLink());
                 return DoMissionTripSupporter();
-
+            }
             var message = DoEnrollments();
 
             if (IsMissionTripGoerWithPayment())
+            {
                 DoMissionTripGoer();
+            }
             else if (Transaction.Donate > 0)
+            {
                 message = DoDonationModifyMessage(message);
+            }
             else
+            {
                 message = donationtext.Replace(message, "");
+            }
 
             SendAllConfirmations(message);
 
@@ -55,11 +65,17 @@ namespace CmsWeb.Areas.OnlineReg.Models
                 p.CheckNotifyDiffEmails();
 
                 if (p.IsCreateAccount())
+                {
                     p.CreateAccount();
-                DbUtil.Db.SubmitChanges();
+                }
 
+                DbUtil.Db.SubmitChanges();
+            }
+            foreach (var p in List)
+            {
                 SendSingleConfirmationForOrg(p);
             }
+
             return true;
         }
 
@@ -79,7 +95,9 @@ namespace CmsWeb.Areas.OnlineReg.Models
 
             var firstPerson = List[0].person;
             if (user != null)
+            {
                 firstPerson = user;
+            }
 
             var notifyIds = GetNotifyIds();
             if (subject != "DO NOT SEND")
@@ -94,7 +112,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
             {
                 var messageNotice = UsedAdminsForNotify
                     ? @"<span style='color:red'>THERE ARE NO NOTIFY IDS ON THIS REGISTRATION!!</span><br/>
-<a href='http://docs.touchpointsoftware.com/OnlineRegistration/MessagesSettings.html'>see documentation</a><br/><br/>"
+<a href='https://docs.touchpointsoftware.com/OnlineRegistration/MessagesSettings.html'>see documentation</a><br/><br/>"
                     : "";
                 DbUtil.Db.Email(Util.PickFirst(p.person.FromEmail, notifyIds[0].FromEmail), notifyIds, Header,
                     $@"{messageNotice}{p.person.Name} has registered for {Header}<br/><hr>
@@ -105,8 +123,11 @@ namespace CmsWeb.Areas.OnlineReg.Models
         private TransactionSummary transactionSummary;
         public TransactionSummary TransactionSummary()
         {
-            if(transactionSummary == null)
+            if (transactionSummary == null)
+            {
                 transactionSummary = DbUtil.Db.ViewTransactionSummaries.SingleOrDefault(tt => tt.RegId == Transaction.OriginalId && tt.PeopleId == List[0].PeopleId);
+            }
+
             return transactionSummary;
         }
 
@@ -117,7 +138,7 @@ namespace CmsWeb.Areas.OnlineReg.Models
             var emailSubject = GetSubject(p);
             var message = p.GetMessage();
             var details = "";
-            if(message.Contains("{details}"))
+            if (message.Contains("{details}"))
             {
                 details = p.PrepareSummaryText(DbUtil.Db);
                 message = message.Replace("{details}", details);
@@ -127,15 +148,21 @@ namespace CmsWeb.Areas.OnlineReg.Models
 
             var location = p.org.Location;
             if (!location.HasValue())
+            {
                 location = masterorg.Location;
+            }
 
             message = APIOrganization.MessageReplacements(DbUtil.Db, p.person,
                 masterorg.OrganizationName, p.org.OrganizationId, p.org.OrganizationName, location, message);
 
             if (Transaction.Donate > 0 && p == List[donor ?? 0])
+            {
                 message = DoDonationModifyMessage(message);
+            }
             else
+            {
                 message = donationtext.Replace(message, "");
+            }
 
             // send confirmations
             if (emailSubject != "DO NOT SEND")
@@ -157,13 +184,25 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         private Settings GetMasterOrgSettings()
         {
             if (_masterSettings != null)
+            {
                 return _masterSettings;
+            }
+
             if (masterorgid == null)
+            {
                 throw new Exception("masterorgid was null in SendConfirmation");
+            }
+
             if (settings == null)
+            {
                 throw new Exception("settings was null");
+            }
+
             if (!settings.ContainsKey(masterorgid.Value))
+            {
                 throw new Exception("setting not found for masterorgid " + masterorgid.Value);
+            }
+
             ParseSettings();
             return _masterSettings = settings[masterorgid.Value];
         }
@@ -199,8 +238,10 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
             var p = List[0];
             Transaction.Fund = p.setting.DonationFund();
             if (!p.orgid.HasValue || !p.PeopleId.HasValue)
+            {
                 throw new Exception(
                     $"DoMissionTripGoer missing org or person: orgid={p.orgid ?? 0} or peopleid={p.PeopleId ?? 0}");
+            }
 
             DbUtil.Db.GoerSenderAmounts.InsertOnSubmit(
                 new GoerSenderAmount
@@ -212,7 +253,9 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
                     SupporterId = p.PeopleId.Value
                 });
             if (Transaction.TransactionId.StartsWith("Coupon") || !Transaction.Amt.HasValue)
+            {
                 return;
+            }
 
             p.person.PostUnattendedContribution(DbUtil.Db,
                 Transaction.Amt.Value, p.setting.DonationFundId,
@@ -224,13 +267,19 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         private List<Person> GetNotifyIds(OnlineRegPersonModel p)
         {
             if (_notifyIds != null)
+            {
                 return _notifyIds;
+            }
+
             return _notifyIds = DbUtil.Db.StaffPeopleForOrg(p.org.OrganizationId, out UsedAdminsForNotify);
         }
         private List<Person> GetNotifyIds()
         {
             if (_notifyIds != null)
+            {
                 return _notifyIds;
+            }
+
             return _notifyIds = DbUtil.Db.StaffPeopleForOrg(org.OrganizationId, out UsedAdminsForNotify);
         }
 
@@ -255,13 +304,18 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
                     NoNoticeToGoer = p.MissionTripNoNoticeToGoer
                 };
                 if (goerid > 0)
+                {
                     gsa.GoerId = goerid;
+                }
+
                 DbUtil.Db.GoerSenderAmounts.InsertOnSubmit(gsa);
                 if (p.Parent.GoerSupporterId.HasValue)
                 {
                     var gs = DbUtil.Db.GoerSupporters.Single(gg => gg.Id == p.Parent.GoerSupporterId);
                     if (!gs.SupporterId.HasValue)
+                    {
                         gs.SupporterId = p.PeopleId;
+                    }
                 }
                 if (!Transaction.TransactionId.StartsWith("Coupon"))
                 {
@@ -321,7 +375,10 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         private string GetSubject(OnlineRegPersonModel p)
         {
             if (p.setting.Subject.HasValue())
+            {
                 return Util.PickFirst(p.setting.Subject, defaultSubject);
+            }
+
             var os = GetMasterOrgSettings();
             return Util.PickFirst(os.Subject, defaultSubject);
         }
@@ -329,11 +386,17 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         private string GetSubject()
         {
             if (_subject.HasValue())
+            {
                 return _subject;
+            }
+
             var orgsettings = settings[org.OrganizationId];
             _subject = Util.PickFirst(orgsettings.Subject, defaultSubject);
             if (Header.HasValue())
+            {
                 return _subject = _subject.Replace("{org}", Header);
+            }
+
             return _subject;
         }
 
@@ -346,12 +409,17 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
                 p.CheckNotifyDiffEmails();
 
                 if (p.IsCreateAccount())
+                {
                     p.CreateAccount();
+                }
+
                 DbUtil.Db.SubmitChanges();
             }
             var message = List[0].GetMessage();
             if (!message.Contains("{details}"))
+            {
                 return message;
+            }
 
             var details = GetDetailsSection();
             message = message.Replace("{details}", details);
@@ -362,9 +430,15 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         {
             var details = new StringBuilder();
             if (Transaction?.Amt > 0)
+            {
                 details.Append(List[0].SummaryTransaction());
+            }
+
             foreach (var p in List)
+            {
                 details.Append(p.PrepareSummaryText(DbUtil.Db));
+            }
+
             return details.ToString();
         }
 
@@ -377,9 +451,15 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
             foreach (var p in List)
             {
                 if (p.PeopleId == null)
+                {
                     continue;
+                }
+
                 if (transactionPeople.Any(pp => pp.PeopleId == p.PeopleId))
+                {
                     continue;
+                }
+
                 var tp = new TransactionPerson
                 {
                     PeopleId = p.PeopleId.Value,
@@ -395,7 +475,9 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
                 // reload transaction because it is not in this context
                 var om = DbUtil.Db.OrganizationMembers.SingleOrDefault(mm => mm.PeopleId == GoerId && mm.OrganizationId == Orgid);
                 if (om != null && om.TranId.HasValue)
+                {
                     Transaction.OriginalId = om.TranId;
+                }
             }
             else
             {
@@ -403,7 +485,7 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
             }
             Transaction.Emails = listMailAddress.EmailAddressListToString();
             Transaction.Participants = participants;
-            Transaction.TransactionDate = DateTime.Now;
+            Transaction.TransactionDate = Util.Now;
         }
 
         private string GetParticipants(List<MailAddress> elist)
@@ -418,7 +500,9 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
                     if (i > 0)
                     {
                         if (List[i].AddressLineOne.HasValue() && List[i].AddressLineOne == List[i - 1].AddressLineOne)
+                        {
                             uperson = List[i - 1].person; // add to previous family
+                        }
                     }
                     p.AddPerson(uperson, p.org.EntryPointId ?? 0);
                 }
@@ -444,9 +528,14 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
             if (UserPeopleId.HasValue)
             {
                 if (user.SendEmailAddress1 ?? true)
+                {
                     Util.AddGoodAddress(elist, user.FromEmail);
+                }
+
                 if (user.SendEmailAddress2 ?? false)
+                {
                     Util.AddGoodAddress(elist, user.FromEmail2);
+                }
             }
             return elist;
         }
@@ -460,19 +549,27 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
                 var coup = match.Groups["coupon"];
                 var coupon = "";
                 if (coup != null)
+                {
                     coupon = coup.Value.Replace(" ", "");
+                }
+
                 if (coupon != "Admin")
                 {
                     var c = DbUtil.Db.Coupons.SingleOrDefault(cp => cp.Id == coupon);
                     if (c == null)
+                    {
                         return;
+                    }
+
                     c.RegAmount = AmtPaid;
                     c.Used = DateTime.Now;
                     c.PeopleId = List[0].PeopleId;
                     Log("CouponUsed");
                 }
                 else
+                {
                     Log("AdminCouponUsed");
+                }
             }
         }
 
@@ -484,6 +581,7 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
             message = message.Replace("{orgname}", Header).Replace("{org}", Header);
 
             var Staff = DbUtil.Db.StaffPeopleForOrg(Orgid.Value);
+
             p.SendOneTimeLink(Staff.First().FromEmail,
                 DbUtil.Db.ServerLink("/OnlineReg/RegisterLink/"), "Manage Your Registration for " + Header, message);
             Log("SendReRegisterLink");
@@ -493,9 +591,14 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         {
             var p = List[0];
             if (p.IsNew)
+            {
                 p.AddPerson(null, GetEntryPoint());
+            }
+
             if (p.CreatingAccount)
+            {
                 p.CreateAccount();
+            }
 
             var c = DbUtil.Content("OneTimeConfirmation");
             if (c == null)
@@ -511,6 +614,7 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
             }
 
             var Staff = DbUtil.Db.StaffPeopleForOrg(masterorgid.Value);
+
             p.SendOneTimeLink(
                 Staff.First().FromEmail,
                 DbUtil.Db.ServerLink("/OnlineReg/ManageSubscriptions/"), c.Title, c.Body);
@@ -522,9 +626,14 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         {
             var p = List[0];
             if (p.IsNew)
+            {
                 p.AddPerson(null, GetEntryPoint());
+            }
+
             if (p.CreatingAccount)
+            {
                 p.CreateAccount();
+            }
 
             var c = DbUtil.Content("OneTimeConfirmationVolunteer");
             if (c == null)
@@ -540,6 +649,7 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
 
             List<Person> Staff = null;
             Staff = DbUtil.Db.StaffPeopleForOrg(Orgid.Value);
+
             p.SendOneTimeLink(
                 Staff.First().FromEmail,
                 DbUtil.Db.ServerLink("/OnlineReg/ManageVolunteer/"), c.Title, c.Body);
@@ -552,9 +662,14 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         {
             var p = List[0];
             if (p.IsNew)
+            {
                 p.AddPerson(null, p.org.EntryPointId ?? 0);
+            }
+
             if (p.CreatingAccount)
+            {
                 p.CreateAccount();
+            }
 
             var c = DbUtil.Content("OneTimeConfirmationPledge");
             if (c == null)
@@ -579,9 +694,14 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         {
             var p = List[0];
             if (p.IsNew)
+            {
                 p.AddPerson(null, p.org.EntryPointId ?? 0);
+            }
+
             if (p.CreatingAccount)
+            {
                 p.CreateAccount();
+            }
 
             var c = DbUtil.Content("OneTimeManageGiving");
             if (c == null)
@@ -595,9 +715,17 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
                 DbUtil.Db.SubmitChanges();
             }
 
+            var parameters = new List<string>
+            {
+                $"{(!string.IsNullOrWhiteSpace(Campus) ? $"campus={Campus}" : string.Empty)}",
+                $"{(!string.IsNullOrWhiteSpace(DefaultFunds) ? $"funds={DefaultFunds}" : string.Empty)}"
+            };
+
+            var appendQueryString = string.Join("&", parameters.Where(i => !string.IsNullOrEmpty(i)));
+
             p.SendOneTimeLink(
                 DbUtil.Db.StaffPeopleForOrg(Orgid.Value).First().FromEmail,
-                DbUtil.Db.ServerLink("/OnlineReg/ManageGiving/"), c.Title, c.Body);
+                DbUtil.Db.ServerLink($"/OnlineReg/ManageGiving/"), c.Title, c.Body, appendQueryString);
             Log("SendOneTimeLinkManageGiving");
             return ConfirmEnum.ConfirmAccount;
         }
@@ -605,9 +733,15 @@ Total Fee paid for this registration session: {ts?.TotPaid:C}<br/>
         public int GetEntryPoint()
         {
             if (org != null && org.EntryPointId != null)
+            {
                 return org.EntryPointId.Value;
+            }
+
             if (masterorg != null && masterorg.EntryPointId != null)
+            {
                 return masterorg.EntryPointId.Value;
+            }
+
             return 0;
         }
 

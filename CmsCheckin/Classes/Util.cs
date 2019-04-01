@@ -238,11 +238,6 @@ namespace CmsCheckin
 			var s = Encoding.ASCII.GetString(resp);
 		}
 
-		public static bool AllDigits(string str)
-		{
-			Regex patt = new Regex("[^0-9]");
-			return !(patt.IsMatch(str));
-		}
 		public static string FmtFone(this string phone)
 		{
 			var ph = phone.GetDigits();
@@ -376,8 +371,7 @@ namespace CmsCheckin
 				//System.Threading.Thread.Sleep(1500);
 #endif
 				var s = Encoding.ASCII.GetString(resp);
-			}
-			catch (Exception) {
+			} catch (Exception) {
 			}
 		}
 
@@ -391,8 +385,7 @@ namespace CmsCheckin
 				var url = Program.settings.createURI(s);
 				var resp = wc.UploadValues(url, "POST", coll);
 				return Encoding.ASCII.GetString(resp).ToInt();
-			}
-			catch (Exception) { }
+			} catch (Exception) { }
 
 			return 0;
 		}
@@ -413,8 +406,7 @@ namespace CmsCheckin
 
 				int ret = Encoding.ASCII.GetString(resp).ToInt();
 				return (ret == 0);
-			}
-			catch (Exception) { }
+			} catch (Exception) { }
 
 			return false;
 		}
@@ -435,8 +427,7 @@ namespace CmsCheckin
 				var url = Program.settings.createURI(s);
 				var ret = wc.UploadData(url, "POST", bits);
 				return Encoding.ASCII.GetString(ret).ToInt();
-			}
-			catch (Exception) {
+			} catch (Exception) {
 			}
 			return 0;
 		}
@@ -446,8 +437,7 @@ namespace CmsCheckin
 				var wc = CreateWebClient();
 				var url = Program.settings.createURI("Checkin2/BuildingUnCheckin/" + pid);
 				wc.UploadString(url, "POST", "");
-			}
-			catch (Exception) {
+			} catch (Exception) {
 			}
 		}
 		public static void JoinUnJoin(ClassInfo c, bool joining)
@@ -467,8 +457,7 @@ namespace CmsCheckin
 				//System.Threading.Thread.Sleep(1500);
 #endif
 				var s = Encoding.ASCII.GetString(resp);
-			}
-			catch (Exception) {
+			} catch (Exception) {
 			}
 		}
 		public static void AddUpdateNotes(int peopleid, string notes)
@@ -482,8 +471,7 @@ namespace CmsCheckin
 				var url = Program.settings.createURI("APIPerson/AddEditExtraValue/");
 				var resp = wc.UploadValues(url, "POST", coll);
 				var s = Encoding.ASCII.GetString(resp);
-			}
-			catch (Exception) {
+			} catch (Exception) {
 			}
 		}
 		public static void UnLockFamily()
@@ -497,8 +485,7 @@ namespace CmsCheckin
 				var url = Program.settings.createURI("Checkin2/UnLockFamily/");
 				var resp = wc.UploadValues(url, "POST", coll);
 				var s = Encoding.ASCII.GetString(resp);
-			}
-			catch (Exception) {
+			} catch (Exception) {
 			}
 		}
 		public static void ReportPrinterProblem()
@@ -511,8 +498,7 @@ namespace CmsCheckin
 				var url = Program.settings.createURI("Checkin2/ReportPrinterProblem/");
 				var resp = wc.UploadValues(url, "POST", coll);
 				var s = Encoding.ASCII.GetString(resp);
-			}
-			catch (Exception) {
+			} catch (Exception) {
 			}
 		}
 		public static void UploadPrintJob(IEnumerable<LabelInfo> q)
@@ -571,6 +557,10 @@ namespace CmsCheckin
 			return "";
 		}
 
+		public static string Fmt(this string fmt, params object[] p)
+		{
+			return string.Format(fmt, p);
+		}
 	}
 	public class EventArgs<T> : EventArgs
 	{

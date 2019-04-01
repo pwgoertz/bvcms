@@ -1,10 +1,10 @@
-using System.ComponentModel;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Web;
 using CmsData;
+using CmsData.Classes.RoleChecker;
+using CmsData.View;
 using CmsWeb.Code;
-using CmsWeb.Models;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq;
 using UtilityExtensions;
 
 namespace CmsWeb.Areas.Org.Models
@@ -18,7 +18,9 @@ namespace CmsWeb.Areas.Org.Models
             set
             {
                 if (Org == null)
+                {
                     Org = DbUtil.Db.LoadOrganizationById(value);
+                }
             }
         }
 
@@ -53,7 +55,7 @@ namespace CmsWeb.Areas.Org.Models
             }
         }
 
-        public bool CollapsedOrganizationDetails => HttpContext.Current.User.IsInRole("OrgLeadersOnly") && DbUtil.Db.Setting("UX-OrgLeaderLimitedSearchPerson");
+        public bool CollapsedOrganizationDetails => RoleChecker.HasSetting(SettingName.Organization_CollapseOrgDetails, false);
 
         private string _schedule;
         public string Schedule
@@ -61,11 +63,14 @@ namespace CmsWeb.Areas.Org.Models
             get
             {
                 if (_schedule.HasValue())
+                {
                     return _schedule;
+                }
+
                 var sch = (from sc in DbUtil.Db.OrgSchedules
-                    where sc.OrganizationId == Id
-                    orderby sc.Id
-                    select sc).FirstOrDefault();
+                           where sc.OrganizationId == Id
+                           orderby sc.Id
+                           select sc).FirstOrDefault();
                 return _schedule = sch == null ? "None" : (new ScheduleInfo(sch)).Display;
             }
         }
@@ -75,5 +80,7 @@ namespace CmsWeb.Areas.Org.Models
             this.CopyPropertiesTo(Org);
             DbUtil.Db.SubmitChanges();
         }
+
+        public IEnumerable<SearchDivision> Divisions { get; set; }
     }
 }

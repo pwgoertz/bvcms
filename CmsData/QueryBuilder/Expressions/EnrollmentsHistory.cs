@@ -19,7 +19,7 @@ namespace CmsData
         internal Expression WasMemberAsOf()
         {
             var tf = CodeIds == "1";
-            var now = DateTime.Now;
+            var now = Util.Now;
             EndDate = EndDate?.AddDays(1) ?? StartDate?.AddDays(1);
             Expression<Func<Person, bool>> pred = p => (
                 from et in p.EnrollmentTransactions
@@ -36,14 +36,14 @@ namespace CmsData
                 select et
                 ).Any();
             Expression expr = Expression.Convert(Expression.Invoke(pred, parm), typeof(bool));
-            if (!(op == CompareType.Equal && tf))
+            if (op == CompareType.Equal ^ tf)
                 expr = Expression.Not(expr);
             return expr;
         }
         internal Expression WasRecentMemberOf()
         {
             var tf = CodeIds == "1";
-            var now = DateTime.Now;
+            var now = Util.Now;
             var dt = now.AddDays(-Days).Date;
             Expression<Func<Person, bool>> pred = p => (
                 from et in p.EnrollmentTransactions
@@ -59,7 +59,7 @@ namespace CmsData
                 select et
                 ).Any();
             Expression expr = Expression.Convert(Expression.Invoke(pred, parm), typeof(bool));
-            if (!(op == CompareType.Equal && tf))
+            if (op == CompareType.Equal ^ tf)
                 expr = Expression.Not(expr);
             return expr;
         }
@@ -76,7 +76,7 @@ namespace CmsData
                 select et
                 ).Any();
             Expression expr = Expression.Convert(Expression.Invoke(pred, parm), typeof(bool));
-            if (!(op == CompareType.Equal && tf))
+            if (op == CompareType.Equal ^ tf)
                 expr = Expression.Not(expr);
             return expr;
         }
@@ -466,7 +466,7 @@ namespace CmsData
                 select om
                 ).Any();
             Expression expr = Expression.Convert(Expression.Invoke(pred, parm), typeof(bool));
-            if (!(op == CompareType.Equal && tf))
+            if (op == CompareType.Equal ^ tf)
                 expr = Expression.Not(expr);
             return expr;
         }

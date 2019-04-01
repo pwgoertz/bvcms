@@ -1,9 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Web.Mvc;
 using CmsData;
-using CmsData.Codes;
 using CmsWeb.Areas.Org.Models;
 using UtilityExtensions;
 
@@ -19,16 +16,14 @@ namespace CmsWeb.Areas.Org.Controllers
         [HttpGet, Route("~/Org/{id:int}")]
         public ActionResult Index(int id, int? peopleid = null)
         {
-            var db = DbUtil.Db;
             if (id == 0)
             {
                 var recent = Util2.MostRecentOrgs;
                 id = recent.Any() ? recent[0].Id : 1;
                 return Redirect($"/Org/{id}");
             }
-            db.CurrentOrg = new CurrentOrg {Id = id, GroupSelect = GroupSelectCode.Member};
-
-            var m = new OrganizationModel(id);
+            var m = OrganizationModel.Create(CurrentDatabase, CurrentUser);
+            m.OrgId = id;
             if (peopleid.HasValue)
                 m.NameFilter = peopleid.ToString();
 
@@ -37,15 +32,12 @@ namespace CmsWeb.Areas.Org.Controllers
 
             if (Util2.OrgLeadersOnly)
             {
-                var oids = DbUtil.Db.GetLeaderOrgIds(Util.UserPeopleId);
+                var oids = CurrentDatabase.GetLeaderOrgIds(Util.UserPeopleId);
                 if (!oids.Contains(m.Org.OrganizationId))
                     return NotAllowed("You must be a leader of this organization", m.Org.OrganizationName);
-                var sgleader = DbUtil.Db.SmallGroupLeader(id, Util.UserPeopleId);
+                var sgleader = CurrentDatabase.SmallGroupLeader(id, Util.UserPeopleId);
                 if (sgleader.HasValue())
-                {
-                    db.CurrentOrg.SgFilter = sgleader;
                     m.SgFilter = sgleader;
-                }
             }
             if (m.Org.LimitToRole.HasValue())
                 if (!User.IsInRole(m.Org.LimitToRole))
@@ -53,12 +45,13 @@ namespace CmsWeb.Areas.Org.Controllers
 
             DbUtil.LogOrgActivity($"Viewing Org({m.Org.OrganizationName})", id, m.Org.OrganizationName);
 
+            m.OrgMain.Divisions = GetOrgDivisions(id);
+
             ViewBag.OrganizationContext = true;
             ViewBag.orgname = m.Org.FullName;
             ViewBag.model = m;
             ViewBag.selectmode = 0;
-            InitExportToolbar(id);
-            m.GroupSelect = "10";
+            InitExportToolbar(m);
             Session["ActiveOrganization"] = m.Org.OrganizationName;
             return View(m);
         }
@@ -73,49 +66,49 @@ namespace CmsWeb.Areas.Org.Controllers
         [HttpPost]
         public ActionResult Delete(int id)
         {
-            var org = DbUtil.Db.LoadOrganizationById(id);
+            var org = CurrentDatabase.LoadOrganizationById(id);
             if (org == null)
                 return Content("error, bad orgid");
             if (id == 1)
                 return Content("Cannot delete first org");
-            if (!org.PurgeOrg(DbUtil.Db))
-                return Content("error, not deleted");
-            var currorg = Util2.CurrentOrganization;
-            currorg.Id = 0;
-            currorg.SgFilter = null;
+            var err = org.PurgeOrg(CurrentDatabase);
+            if(err.HasValue())
+                return Content($"error, {err}");
             DbUtil.LogActivity($"Delete Org {Session["ActiveOrganization"]}");
             Session.Remove("ActiveOrganization");
             return Content("ok");
         }
 
-        private void InitExportToolbar(int oid)
+        private void InitExportToolbar(OrganizationModel m)
         {
-            ViewBag.oid = oid;
-            var qid = DbUtil.Db.QueryInCurrentOrg().QueryId;
-            ViewBag.queryid = qid;
-            ViewBag.TagAction = "/Org/TagAll/" + qid;
-            ViewBag.UnTagAction = "/Org/UnTagAll/" + qid;
-            ViewBag.AddContact = "/Org/AddContact/" + qid;
-            ViewBag.AddTasks = "/Org/AddTasks/" + qid;
+            ViewBag.oid = m.Id;
+            ViewBag.queryid = m.QueryId;
+            ViewBag.TagAction = "/Org/TagAll/" + m.QueryId;
+            ViewBag.UnTagAction = "/Org/UnTagAll/" + m.QueryId;
+            ViewBag.AddContact = "/Org/AddContact/" + m.QueryId;
+            ViewBag.AddTasks = "/Org/AddTasks/" + m.QueryId;
             ViewBag.OrganizationContext = true;
-            if (!DbUtil.Db.Organizations.Any(oo => oo.ParentOrgId == oid))
+            if (!CurrentDatabase.Organizations.Any(oo => oo.ParentOrgId == m.Id))
                 return;
+
             ViewBag.ParentOrgContext = true;
-            ViewBag.leadersqid = DbUtil.Db.QueryLeadersUnderCurrentOrg().QueryId;
-            ViewBag.membersqid = DbUtil.Db.QueryMembersUnderCurrentOrg().QueryId;
+            ViewBag.leadersqid = CurrentDatabase.QueryLeadersUnderCurrentOrg().QueryId;
+            ViewBag.membersqid = CurrentDatabase.QueryMembersUnderCurrentOrg().QueryId;
         }
 
         [HttpPost]
         public ActionResult Settings(int id)
         {
-            var m = new OrganizationModel(id);
+            var m = OrganizationModel.Create(CurrentDatabase, CurrentUser);
+            m.OrgId = id;
             return PartialView(m);
         }
 
         [HttpPost]
         public ActionResult Registrations(int id)
         {
-            var m = new OrganizationModel(id);
+            var m = OrganizationModel.Create(CurrentDatabase, CurrentUser);
+            m.OrgId = id;
             return PartialView(m);
         }
 
@@ -151,14 +144,15 @@ namespace CmsWeb.Areas.Org.Controllers
         [HttpPost]
         public ActionResult CommunityGroup(int id)
         {
-            var m = new OrganizationModel(id);
+            var m = OrganizationModel.Create(CurrentDatabase, CurrentUser);
+            m.OrgId = id;
             return PartialView(m);
         }
 
         [HttpPost]
         public ActionResult AddContactReceived(int id)
         {
-            var o = DbUtil.Db.LoadOrganizationById(id);
+            var o = CurrentDatabase.LoadOrganizationById(id);
             DbUtil.LogPersonActivity($"Adding contact to organization: {o.FullName}", id, o.FullName);
             var c = new Contact
             {
@@ -168,14 +162,14 @@ namespace CmsWeb.Areas.Org.Controllers
                 OrganizationId = o.OrganizationId
             };
 
-            DbUtil.Db.Contacts.InsertOnSubmit(c);
-            DbUtil.Db.SubmitChanges();
+            CurrentDatabase.Contacts.InsertOnSubmit(c);
+            CurrentDatabase.SubmitChanges();
 
             c.contactsMakers.Add(new Contactor { PeopleId = Util.UserPeopleId.Value });
-            DbUtil.Db.SubmitChanges();
+            CurrentDatabase.SubmitChanges();
 
-            var defaultRole = DbUtil.Db.Setting("Contacts-DefaultRole", null);
-            if (!string.IsNullOrEmpty(defaultRole) && DbUtil.Db.Roles.Any(x => x.RoleName == defaultRole))
+            var defaultRole = CurrentDatabase.Setting("Contacts-DefaultRole", null);
+            if (!string.IsNullOrEmpty(defaultRole) && CurrentDatabase.Roles.Any(x => x.RoleName == defaultRole))
                 TempData["SetRole"] = defaultRole;
 
             TempData["ContactEdit"] = true;

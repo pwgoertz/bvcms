@@ -49,10 +49,14 @@
             @balance.ToString("C")
           </td>
           <td style="width: 50px;">
-            @if (Util.UserPeopleId == Model.PeopleId || User.IsInRole("Admin"))
-            {
-              <a href="/MissionTripEmail2/@g.Id/@Model.PeopleId" class="btn btn-default btn-sm"><i class="fa fa-envelope-o"></i> Email Supporters</a>
-            }
+              @if (g.ShowFundingLink)
+              {
+                  <a href="/OnlineReg/@g.Id/Giving/@Model.PeopleId" class="btn btn-default btn-sm">Funding Page</a>
+              }
+              @if (Util.UserPeopleId == Model.PeopleId || User.IsInRole("Admin"))
+              {
+                 <a href="/MissionTripEmail2/@g.Id/@Model.PeopleId" class="btn btn-default btn-sm"><i class="fa fa-envelope-o"></i> Email Supporters</a>
+              }
           </td>
         </tr>
       }
@@ -141,9 +145,11 @@
       </div>
     </div>
   </div>
-  <h4>Registration Log</h4>
-  @Html.TextAreaFor(m => m.Comments, new { @class = "form-control", disabled = "disabled", style = "cursor: text;", rows = 10 })
-  <br />
+  @if(Model.ShowComments) {
+      <h4>Registration Log</h4>
+      @Html.TextAreaFor(m => m.Comments, new { @class = "form-control", disabled = true, style = "cursor: text;", rows = 10 })
+      <br />
+  }
   @FormActions()
   @FormActions(true)
   @Html.HiddenFor2(m => m.PeopleId)

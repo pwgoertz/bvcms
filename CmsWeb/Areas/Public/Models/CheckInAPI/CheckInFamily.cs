@@ -1,7 +1,13 @@
 ﻿using CmsData;
+using ImageData;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DbUtil = CmsData.DbUtil;
+
+// ReSharper disable MemberInitializerValueIgnored
+// ReSharper disable RedundantDefaultMemberInitializer
+// ReSharper disable CheckNamespace
 
 namespace CmsWeb.CheckInAPI
 {
@@ -24,14 +30,16 @@ namespace CmsWeb.CheckInAPI
 
             Family family = DbUtil.Db.Families.SingleOrDefault(f => f.FamilyId == id);
 
-            if (family.Picture != null)
+            if (family == null || family.Picture == null)
             {
-                var image = ImageData.DbUtil.Db.Images.SingleOrDefault(i => i.Id == family.Picture.SmallId);
+                return;
+            }
 
-                if (image != null)
-                {
-                    picture = Convert.ToBase64String(image.Bits);
-                }
+            Image image = ImageData.DbUtil.Db.Images.SingleOrDefault(i => i.Id == family.Picture.SmallId);
+
+            if (image != null)
+            {
+                picture = Convert.ToBase64String(image.Bits);
             }
         }
 
@@ -43,13 +51,15 @@ namespace CmsWeb.CheckInAPI
             }
             else
             {
-                foreach (var member in members)
+                foreach (CheckInFamilyMember member in members)
                 {
-                    if (member.id == newMember.Id)
+                    if (member.id != newMember.Id)
                     {
-                        member.addOrg(newMember, day, tzOffset);
-                        return;
+                        continue;
                     }
+
+                    member.addOrg(newMember, day, tzOffset);
+                    return;
                 }
 
                 members.Add(new CheckInFamilyMember(newMember, day, tzOffset));

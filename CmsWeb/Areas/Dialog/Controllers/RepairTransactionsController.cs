@@ -1,29 +1,33 @@
-﻿using System.Web.Mvc;
+﻿using CmsData;
 using CmsWeb.Areas.Dialog.Models;
-using CmsData;
+using CmsWeb.Lifecycle;
+using System.Web.Mvc;
 
 namespace CmsWeb.Areas.Dialog.Controllers
 {
-    [RouteArea("Dialog", AreaPrefix="RepairTransactions"), Route("{action}/{id?}")]
+    [RouteArea("Dialog", AreaPrefix = "RepairTransactions"), Route("{action}/{id?}")]
     public class RepairTransactionsController : CmsStaffController
     {
+        public RepairTransactionsController(IRequestManager requestManager) : base(requestManager)
+        {
+        }
+
         [HttpPost, Route("~/RepairTransactions/{id:int}")]
         public ActionResult Index(int id)
         {
             var model = new RepairTransactions(id);
-            model.RemoveExistingLop(DbUtil.Db, id, RepairTransactions.Op);
             return View(model);
         }
 
         [HttpPost]
         public ActionResult Process(RepairTransactions model)
         {
-            model.UpdateLongRunningOp(DbUtil.Db, RepairTransactions.Op);
+            model.UpdateLongRunningOp(CurrentDatabase, RepairTransactions.Op);
 
             if (!model.Started.HasValue)
             {
-                DbUtil.LogActivity($"Add to org from tag for {Session["ActiveOrganization"]}");
-                model.Process(DbUtil.Db);
+                DbUtil.LogActivity($"Repair Transactions for {Session["ActiveOrganization"]}");
+                model.Process(CurrentDatabase);
             }
             return View(model);
         }

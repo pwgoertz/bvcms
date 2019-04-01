@@ -291,8 +291,8 @@ namespace CmsWeb.Areas.Search.Models
                     orgIds = DbUtil.Db.OrganizationExtras
                         .Where(x => orgIds.Contains(x.OrganizationId) && x.Field == ev.Key &&
                             (
-                             x.StrValue.ToLower().Contains(ev.Value) ||
-                             x.Data.ToLower().Contains(ev.Value)) ||
+                             x.Type.Equals("Code") ? x.StrValue.ToLower().Equals(ev.Value) : x.StrValue.ToLower().Contains(ev.Value) ||
+                             x.Type.Equals("Code") ? x.Data.ToLower().Equals(ev.Value) : x.Data.ToLower().Contains(ev.Value)) ||
                              x.DateValue != null && x.DateValue.ToString().Contains(ev.Value) ||
                              x.IntValue != null && x.IntValue.ToString().Contains(ev.Value) ||
                              x.BitValue != null && x.BitValue.ToString().Contains(ev.Value)
@@ -377,7 +377,7 @@ namespace CmsWeb.Areas.Search.Models
                                select o;
                         break;
                     case "Members":
-                    case "Curr":
+                    case "Current":
                         list = from o in query
                                orderby o.MemberCount, o.OrganizationName
                                select o;
@@ -468,7 +468,7 @@ namespace CmsWeb.Areas.Search.Models
                                select o;
                         break;
                     case "Members":
-                    case "Curr":
+                    case "Current":
                         list = from o in query
                                orderby o.MemberCount descending,
                                    o.OrganizationName descending
@@ -515,13 +515,16 @@ namespace CmsWeb.Areas.Search.Models
 
         public IEnumerable<SelectListItem> CampusIds()
         {
-            var q = from c in DbUtil.Db.Campus
-                    select new SelectListItem
-                    {
-                        Value = c.Id.ToString(),
-                        Text = c.Description
-                    };
-            var list = q.ToList();
+            var qc = DbUtil.Db.Campus.AsQueryable();
+            qc = DbUtil.Db.Setting("SortCampusByCode")
+                ? qc.OrderBy(cc => cc.Code)
+                : qc.OrderBy(cc => cc.Description);
+            var list = (from c in qc
+                        select new SelectListItem()
+                        {
+                            Value = c.Id.ToString(),
+                            Text = c.Description,
+                        }).ToList();
             list.Insert(0, new SelectListItem
             {
                 Value = "-1",
@@ -789,6 +792,18 @@ namespace CmsWeb.Areas.Search.Models
             if (!content.Contains("@OrgIds", ignoreCase: true))
                 throw new Exception("missing @OrgIds");
 
+            var p = GetSqlParameters(oids, meetingDate1, meetingDate2, content);
+            var cs = HttpContextFactory.Current.User.IsInRole("Finance")
+                ? Util.ConnectionStringReadOnlyFinance
+                : Util.ConnectionStringReadOnly;
+            var cn = new SqlConnection(cs);
+            cn.Open();
+            return cn.ExecuteReader(content, p, commandTimeout: 1200);
+        }
+
+        public DynamicParameters GetSqlParameters(string oids, DateTime? meetingDate1, DateTime? meetingDate2,
+                                                          string content)
+        {
             var p = new DynamicParameters();
             p.Add("@OrgIds", oids);
             if (content.Contains("@MeetingDate1", ignoreCase: true))
@@ -796,14 +811,9 @@ namespace CmsWeb.Areas.Search.Models
                 p.Add("@MeetingDate1", meetingDate1);
                 p.Add("@MeetingDate2", meetingDate2);
             }
-            if(content.Contains("@userid", ignoreCase:true))
+            if (content.Contains("@userid", ignoreCase: true))
                 p.Add("@userid", Util.UserId);
-            var cs = HttpContext.Current.User.IsInRole("Finance")
-                ? Util.ConnectionStringReadOnlyFinance
-                : Util.ConnectionStringReadOnly;
-            var cn = new SqlConnection(cs);
-            cn.Open();
-            return cn.ExecuteReader(content, p, commandTimeout: 1200);
+            return p;
         }
 
         public static OrgSearchModel DecodedJson(string parameter)
@@ -965,7 +975,7 @@ Divisions: {Divisions}";
 <li><code>master:<em>orgid</em></code> is in the picklist of the master <em>orgid</em></li>
 <li><code>regsetting:<em>comma,separated,keywords</em></code> searches regsetting usage</li>
 </ul>
-<p>For more see <em><strong><a href='http://docs.touchpointsoftware.com/Organizations/OrgSearchNameAdvanced.html' target='_blank'>the documentation</a></p>
+<p>For more see <em><strong><a href='https://docs.touchpointsoftware.com/Organizations/OrgSearchNameAdvanced.html' target='_blank'>the documentation</a></p>
 ");
     }
 }

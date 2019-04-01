@@ -1,7 +1,7 @@
+using CmsWeb.Areas.Dialog.Models;
+using CmsWeb.Lifecycle;
 using System;
 using System.Web.Mvc;
-using CmsWeb.Areas.Dialog.Models;
-using CmsData;
 
 namespace CmsWeb.Areas.Dialog.Controllers
 {
@@ -9,12 +9,14 @@ namespace CmsWeb.Areas.Dialog.Controllers
     [RouteArea("Dialog", AreaPrefix = "OrgMembersUpdate"), Route("{action}")]
     public class OrgMembersUpdateController : CmsStaffController
     {
-        [Route("~/OrgMembersUpdate/{oid:int}")]
-        public ActionResult Index(int oid)
+        public OrgMembersUpdateController(IRequestManager requestManager) : base(requestManager)
         {
-            if (oid != DbUtil.Db.CurrentOrgId0)
-                throw new Exception($"Current org has changed from {oid} to {DbUtil.Db.CurrentOrgId0}, aborting");
-            var m = new OrgMembersUpdate { Id = oid };
+        }
+
+        [Route("~/OrgMembersUpdate/{qid:guid}")]
+        public ActionResult Index(Guid qid)
+        {
+            var m = new OrgMembersUpdate(qid);
             return View(m);
         }
         [HttpPost, Route("Update")]
@@ -62,7 +64,10 @@ namespace CmsWeb.Areas.Dialog.Controllers
         public ActionResult PostTransactions(OrgMembersUpdate m)
         {
             if (!ModelState.IsValid)
+            {
                 return View("AddTransaction", m);
+            }
+
             m.PostTransactions();
             return View("AddTransactionDone", m);
         }
@@ -70,7 +75,10 @@ namespace CmsWeb.Areas.Dialog.Controllers
         protected override void OnException(ExceptionContext filterContext)
         {
             if (filterContext.ExceptionHandled)
+            {
                 return;
+            }
+
             filterContext.Result = Message2(filterContext.Exception.Message);
             filterContext.ExceptionHandled = true;
         }

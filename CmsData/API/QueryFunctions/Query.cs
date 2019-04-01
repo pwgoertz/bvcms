@@ -4,7 +4,10 @@ using System.Configuration;
 using System.Data.Common;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Text.RegularExpressions;
+using CmsData.API;
 using Dapper;
+using IronPython.Runtime;
 using UtilityExtensions;
 
 namespace CmsData
@@ -38,9 +41,9 @@ namespace CmsData
             var qb = db.PeopleQuery2(query);
             if (qb == null)
                 return 0;
-            var start = DateTime.Now;
+            var start = Util.Now;
             var count = qb.Count();
-            ElapsedTime = Math.Round(DateTime.Now.Subtract(start).TotalSeconds).ToInt();
+            ElapsedTime = Math.Round(Util.Now.Subtract(start).TotalSeconds).ToInt();
             return count;
         }
 
@@ -94,7 +97,26 @@ namespace CmsData
             }
             return q;
         }
+        public IEnumerable<int> QueryPeopleIds(string query)
+        {
+            var q = db.PeopleQuery2(query).Select(vv => vv.PeopleId);
+            return q;
+        }
+        public IEnumerable<int> QuerySqlPeopleIds(string query)
+        {
+            return QuerySqlInts(query);
+        }
+        public IEnumerable<int> QuerySqlInts(string query)
+        {
+            var cn = GetReadonlyConnection();
+            return cn.Query<int>(query);
+        }
 
+        public int QuerySqlInt(string sql)
+        {
+            var cn = GetReadonlyConnection();
+            return cn.ExecuteScalar<int>(sql);
+        }
         public dynamic QuerySqlTop1(string sql)
         {
             return QuerySqlTop1(sql, null);
@@ -105,9 +127,9 @@ namespace CmsData
             return QuerySqlTop1(sql, p1, null);
         }
 
-        public dynamic QuerySqlTop1(string sql, object p1, Dictionary<string, string> d)
+        public dynamic QuerySqlTop1(string sql, object p1, object declarations)
         {
-            var q = QuerySql(sql, p1, d);
+            var q = QuerySql(sql, p1, declarations);
             return q.FirstOrDefault();
         }
 
@@ -116,24 +138,103 @@ namespace CmsData
             return QuerySql(sql, null);
         }
 
-        public IEnumerable<dynamic> QuerySql(string sql, object p1)
-        {
-            return QuerySql(sql, p1, null);
-        }
-
-        public IEnumerable<dynamic> QuerySql(string sql, object p1, Dictionary<string, string> d)
+        public IEnumerable<dynamic> QuerySql(string sql, object declarations)
         {
             var cn = GetReadonlyConnection();
             var parameters = new DynamicParameters();
-            parameters.Add("@p1", p1 ?? "");
-            if (d != null)
-                foreach (var kv in d)
-                    parameters.Add("@" + kv.Key, kv.Value);
+            if (declarations != null)
+            {
+                AddParameters(declarations, parameters);
+#if DEBUG
+                sql = RemoveDeclarations(declarations, sql);
+#endif
+            }
+            ApplyStandardParameters(sql, parameters);
+            return cn.Query(sql, parameters, commandTimeout: 300);
+        }
 
+        public IEnumerable<dynamic> QuerySql(string sql, object p1, object declarations)
+        {
+            var cn = GetReadonlyConnection();
+            var parameters = new DynamicParameters();
+            if (p1 != null)
+                sql = AddP1Parameter(sql, p1, parameters);
+            if (declarations != null)
+            {
+                AddParameters(declarations, parameters);
+#if DEBUG
+                sql = RemoveDeclarations(declarations, sql);
+#endif
+            }
+            ApplyStandardParameters(sql, parameters);
+
+            return cn.Query(sql, parameters, commandTimeout: 300);
+        }
+
+        /// <summary>
+        /// This function looks for 'declare @p1 ...' and comments it out since the @p1 parameter is added through the Dynamic parameters.
+        /// This allows the sql to be run in SSMS for testing 
+        /// and also allows it to run via Touchpoint scripts using the q.QuerySql functions without having to edit it.
+        /// </summary>
+        public static string AddP1Parameter(string sql, object p1, DynamicParameters parameters)
+        {
+            const string pattern = "(?m:^)declare @p1 .*$";
+            var regexOptions = RegexOptions.IgnoreCase | RegexOptions.Multiline;
+            if (Regex.IsMatch(sql, pattern, regexOptions))
+                sql = Regex.Replace(sql, pattern, "--$&", regexOptions);
+            parameters.Add("@p1", p1 ?? "");
+            return sql;
+        }
+
+        private static void AddParameters(object declarations, DynamicParameters parameters)
+        {
+            var pd = declarations as PythonDictionary;
+            var dd = declarations as DynamicData;
+            var ds = declarations as Dictionary<string, string>;
+            if (pd != null)
+                foreach (var kv in pd)
+                    parameters.Add("@" + kv.Key, kv.Value);
+            else if (dd != null)
+                foreach (var kv in dd.dict)
+                    parameters.Add("@" + kv.Key, kv.Value);
+            else if (ds != null)
+                foreach (var kv in ds)
+                    parameters.Add("@" + kv.Key, kv.Value);
+            else
+                parameters.Add("@p1", declarations ?? "");
+        }
+
+#if DEBUG
+        public static string RemoveDeclaration(object decl, string body)
+        {
+            return Regex.Replace(body, $@"^declare\s+@{decl}", "--$&", RegexOptions.Multiline | RegexOptions.IgnoreCase);
+        }
+        private static string RemoveDeclarations(object declarations, string body)
+        {
+            var pd = declarations as PythonDictionary;
+            var dd = declarations as DynamicData;
+            var ds = declarations as Dictionary<string, string>;
+            if (pd != null)
+                foreach (var kv in pd)
+                    body = RemoveDeclaration(kv.Key, body);
+            else if (dd != null)
+                foreach (var kv in dd.dict)
+                    body = RemoveDeclaration(kv.Key, body);
+            else if (ds != null)
+                foreach (var kv in ds)
+                    body = RemoveDeclaration(kv.Key, body);
+            else
+                body = RemoveDeclaration("p1", body);
+            return body;
+        }
+#endif
+
+        private void ApplyStandardParameters(string sql, DynamicParameters parameters)
+        {
             if (sql.Contains("@UserPeopleId"))
                 parameters.Add("@UserPeopleId", data.PeopleId ?? Util.UserPeopleId);
             if (sql.Contains("@CurrentOrgId"))
-                parameters.Add("@CurrentOrgId", data.OrgId ?? db.CurrentOrgId0);
+                parameters.Add("@CurrentOrgId", data.OrgId ?? db.CurrentSessionOrgId);
 
             if (sql.Contains("@BlueToolbarTagId"))
                 if (dictionary.ContainsKey("BlueToolbarGuid"))
@@ -145,8 +246,12 @@ namespace CmsData
                     var tag = db.PopulateTemporaryTag(j);
                     parameters.Add("@BlueToolbarTagId", tag.Id);
                 }
+        }
 
-            return cn.Query(sql, parameters, commandTimeout: 300);
+        public string QuerySqlScalar(string sql)
+        {
+            var cn = GetReadonlyConnection();
+            return cn.ExecuteScalar(sql).ToString();
         }
 
         public string SqlNameCountArray(string title, string sql)
@@ -230,6 +335,85 @@ namespace CmsData
             var q = db.PeopleQuery2(query).Select(vv => vv.PeopleId);
             var tag = db.PopulateTemporaryTag(q);
             return tag.Id;
+        }
+
+        public int TagSqlPeopleIds(string sql)
+        {
+            var q = db.Connection.Query<int>(sql);
+            var tag = db.PopulateTempTag(q);
+            return tag.Id;
+        }
+
+        public string GetWhereClause(string code)
+        {
+            var q = db.PeopleQuery2(code);
+            return db.GetWhereClause(q);
+        }
+
+        /// <summary>
+        /// Creates a new DynamicData instance populated with name value columns from sql
+        /// </summary>
+        public DynamicData SqlNameValues(string sql, string NameCol, string ValueCol)
+        {
+            var cn = GetReadonlyConnection();
+            using (var rd = cn.ExecuteReader(sql))
+            {
+                var dd = new DynamicData();
+                while (rd.Read())
+                    dd.dict.Add(rd[NameCol].ToString(), rd[ValueCol]);
+                return dd;
+            }
+        }
+
+        /// <summary>
+        /// Creates a new DynamicData instance 
+        /// where each element is named as the value of the first column of the row 
+        /// and the value of that element is another DynamicData instance 
+        /// populated with name/value pairs corresponding to the columns of the row.
+        /// This is useful for summary data needed for a dashboard report.
+        /// Note that the first column data should be unique to avoid overwriting previous rows.
+        /// The number of rows is limited to 100 to avoid slurping into memory an entire table of People for example.
+        /// </summary>
+        public DynamicData SqlFirstColumnRowKey(string sql, object declarations)
+        {
+            var cn = GetReadonlyConnection();
+            var parameters = new DynamicParameters();
+            if (declarations != null)
+            {
+                AddParameters(declarations, parameters);
+#if DEBUG
+                sql = RemoveDeclarations(declarations, sql);
+#endif
+            }
+            var ret = new DynamicData();
+            using (var rd = cn.ExecuteReader(sql, parameters))
+            {
+                var maxn = 100;
+                while (rd.Read())
+                {
+                    var dd = new DynamicData();
+                    for (var i = 0; i < rd.FieldCount; i++)
+                    {
+                        var t = rd.GetDataTypeName(i);
+                        switch (t)
+                        {
+                            case "datetime":
+                                var dt = rd.GetDateTime(i);
+                                var fmt = dt.TimeOfDay.Equals(TimeSpan.Zero) ? "d" : "g";
+                                dd.AddValue(rd.GetName(i), dt.ToString(fmt));
+                                break;
+                            default:
+                                dd.AddValue(rd.GetName(i), rd.GetValue(i));
+                                break;
+                        }
+                    }
+                    ret.AddValue(rd.GetString(0), dd);
+                    maxn--;
+                    if (maxn == 0)
+                        break;
+                }
+            }
+            return ret;
         }
 
         public class NameValuePair

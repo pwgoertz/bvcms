@@ -82,6 +82,17 @@ RETURN
 							AND r.RoleName = 'Access'
 						)
 				)
+		,nadmins = (SELECT COUNT(*)
+					FROM dbo.Users u
+					WHERE NOT EXISTS(SELECT NULL FROM dbo.Split(@emails, ',') WHERE u.EmailAddress LIKE Value)
+					AND EXISTS(
+							SELECT NULL 
+							FROM dbo.UserRole ur
+							JOIN dbo.Roles r ON r.RoleId = ur.RoleId
+							WHERE ur.UserId = u.UserId
+							AND r.RoleName = 'Admin'
+						)
+				)
 		,reg = CASE WHEN EXISTS(
 					SELECT NULL
 					FROM dbo.OrganizationMembers om
@@ -99,6 +110,25 @@ RETURN
 					FROM dbo.Content
 					WHERE Name = 'notam'
 				) THEN CAST(1 AS BIT) ELSE 0 END
+		,campuses = (SELECT ISNULL(NULLIF(MIN(Cnt), 0), 1)
+					 FROM (
+						SELECT cnt = COUNT(*)
+						FROM (
+							SELECT COUNT(*) Cnt , CampusId, c.Description Campus
+							FROM dbo.People p
+							JOIN lookup.Campus c ON c.Id = p.CampusId
+							GROUP BY CampusId, c.Description
+							HAVING COUNT(*) > 50
+						) tt
+						UNION 
+						SELECT COUNT(*)
+						FROM (
+							SELECT COUNT(*) Cnt , CampusId, c.Description Campus
+							FROM dbo.Organizations o
+							JOIN lookup.Campus c ON c.Id = o.CampusId
+							GROUP BY CampusId, c.Description
+							HAVING COUNT(*) > 5
+						) tt) ttt)
 )
 
 GO

@@ -1,9 +1,11 @@
+using CmsData;
+using CmsData.Classes.RoleChecker;
+using CmsData.Codes;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
-using CmsData;
 using UtilityExtensions;
 using DbUtil = CmsData.DbUtil;
 using Image = ImageData.Image;
@@ -21,7 +23,7 @@ namespace CmsWeb.Models
         public bool NotAuthenticated { get; set; }
         public OrgContent oc { get; set; }
 
-        public bool CanEdit => ((Util.IsInRole("ContentEdit") || Util.IsInRole("Edit") || DbUtil.Db.Setting("UX-LeadersCanAlwaysEditOrgContent")) && IsLeader) ||  Util.IsInRole("Admin");
+        public bool CanEdit => ((Util.IsInRole("ContentEdit") || Util.IsInRole("Edit") || RoleChecker.HasSetting(SettingName.LeadersCanAlwaysEditOrgContent, false)) && IsLeader) || Util.IsInRole("Admin");
 
         private string html;
         public string Html
@@ -29,9 +31,15 @@ namespace CmsWeb.Models
             get
             {
                 if (html.HasValue())
+                {
                     return html;
+                }
+
                 if (oc == null)
+                {
                     return "<h2>" + OrgName + "</h2>";
+                }
+
                 var s = Image.Content(oc.ImageId ?? 0);
                 return html = s;
             }
@@ -44,9 +52,14 @@ namespace CmsWeb.Models
                 }
                 var i = ImageData.DbUtil.Db.Images.SingleOrDefault(ii => ii.Id == oc.ImageId);
                 if (i != null)
+                {
                     i.SetText(value);
+                }
                 else
+                {
                     oc.ImageId = Image.NewTextFromString(value).Id;
+                }
+
                 DbUtil.Db.SubmitChanges();
             }
         }
@@ -87,9 +100,9 @@ namespace CmsWeb.Models
                     {
                         OrgId = oo.OrganizationId,
                         OrgName = oo.OrganizationName,
-                        Inactive = oo.OrganizationStatusId == CmsData.Codes.OrgStatusCode.Inactive,
-                        IsMember = om != null && om.MemberTypeId != CmsData.Codes.MemberTypeCode.InActive,
-                        IsLeader = (memberLeaderType ?? 0) == CmsData.Codes.AttendTypeCode.Leader,
+                        Inactive = oo.OrganizationStatusId == OrgStatusCode.Inactive,
+                        IsMember = om != null && !MemberTypeCode.ProspectInactive.Contains(om.MemberTypeId),
+                        IsLeader = (memberLeaderType ?? 0) == AttendTypeCode.Leader,
                         oc = oc,
                         NotAuthenticated = !Util.UserPeopleId.HasValue
                     };
@@ -98,7 +111,10 @@ namespace CmsWeb.Models
             {
                 var oids = DbUtil.Db.GetLeaderOrgIds(Util.UserPeopleId);
                 if (!oids.Contains(o.OrgId))
+                {
                     return o;
+                }
+
                 o.NotAuthenticated = false;
                 o.IsMember = true;
                 o.IsLeader = true;
@@ -118,7 +134,7 @@ namespace CmsWeb.Models
                         OrgId = oo.OrganizationId,
                         OrgName = oo.OrganizationName,
                         Inactive = oo.OrganizationStatusId == CmsData.Codes.OrgStatusCode.Inactive,
-                        IsMember = om != null && om.MemberTypeId != CmsData.Codes.MemberTypeCode.InActive,
+                        IsMember = om != null && om.MemberTypeId != MemberTypeCode.InActive,
                         IsLeader = (memberLeaderType ?? 0) == CmsData.Codes.AttendTypeCode.Leader,
                         oc = oc,
                         NotAuthenticated = !Util.UserPeopleId.HasValue
@@ -128,7 +144,10 @@ namespace CmsWeb.Models
             {
                 var oids = DbUtil.Db.GetLeaderOrgIds(Util.UserPeopleId);
                 if (!oids.Contains(o.OrgId))
+                {
                     return o;
+                }
+
                 o.NotAuthenticated = false;
                 o.IsMember = true;
                 o.IsLeader = true;
@@ -138,17 +157,19 @@ namespace CmsWeb.Models
 
         public IEnumerable<MemberInfo> GetMemberList()
         {
-            var members = DbUtil.Db.OrgPeopleCurrent(OrgId);
-            foreach (var member in members)
-            {
-                var person = DbUtil.Db.LoadPersonById(member.PeopleId);
-                yield return new MemberInfo
-                {
-                    Name = person.Name,
-                    MemberType = member.MemberType,
-                    PeopleId = member.PeopleId
-                };
-            }
+            return (from om in DbUtil.Db.OrganizationMembers
+                    where om.OrganizationId == OrgId
+                    where
+                        om.MemberTypeId != MemberTypeCode.Prospect &&
+                        om.MemberTypeId != MemberTypeCode.InActive
+                    orderby om.Person.Name
+                    select new MemberInfo
+                    {
+                        Name = om.Person.Name,
+                        MemberType = om.MemberType.Description,
+                        PeopleId = om.PeopleId
+                    })
+                    .ToList();
         }
 
         public class MemberInfo
@@ -162,10 +183,16 @@ namespace CmsWeb.Models
         {
             var ev = Organization.GetExtra(DbUtil.Db, OrgId, "OrgMembersPageScript");
             if (!ev.HasValue())
+            {
                 return false;
+            }
+
             var script = DbUtil.Db.ContentOfTypePythonScript(ev);
             if (!script.HasValue())
+            {
                 return false;
+            }
+
             var pe = new PythonModel(Util.Host);
             pe.Data.OrgId = OrgId;
             pe.Data.PeopleId = pid;

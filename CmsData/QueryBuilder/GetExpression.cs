@@ -1,4 +1,4 @@
-/* Author: David Carroll
+/* Author: David /Baarroll
  * Copyright (c) 2008, 2009 Bellevue Baptist Church 
  * Licensed under the GNU General Public License (GPL v2)
  * you may not use this code except in compliance with the License.
@@ -34,6 +34,7 @@ namespace CmsData
                 { QueryType.Birthday, Birthday },
                 { QueryType.CampusId, CampusId },
                 { QueryType.CcExpiration, CcExpiration },
+                { QueryType.RecentManagedGiving, RecentManagedGiving },
                 { QueryType.CheckInByActivity, CheckInByActivity },
                 { QueryType.CheckInByDate, CheckInByDate },
                 { QueryType.CheckInVisits, CheckInVisits },
@@ -41,10 +42,15 @@ namespace CmsData
                 { QueryType.ContactRecipient, ContactRecipient },
                 { QueryType.ContactMaker, ContactMaker },
                 { QueryType.ContributionAmountBothJointHistory, ContributionAmountBothJointHistory },
+                { QueryType.ContributionAmountSinceSetting, ContributionAmountSinceSetting },
                 { QueryType.PledgeAmountBothJointHistory, PledgeAmountBothJointHistory },
                 { QueryType.ContributionAmount2, ContributionAmount },
+                { QueryType.ContributionAmount2DonorOnly, ContributionAmountDonorOnly },
                 { QueryType.ContributionChange, ContributionChange },
                 { QueryType.CreatedBy, CreatedBy },
+                { QueryType.DaysSinceDate, DaysSinceDate },
+                { QueryType.DaysSinceDateField, DaysSinceDateField },
+                { QueryType.DaysSinceExtraDate, DaysSinceExtraDate },
                 { QueryType.DaysAfterNthVisitAsOf, DaysAfterNthVisitAsOf },
                 { QueryType.DaysBetween12Attendance, DaysBetween12Attendance },
                 { QueryType.DaysSinceContact, DaysSinceContact },
@@ -93,8 +99,8 @@ namespace CmsData
                 { QueryType.HaveVolunteerApplications, HasVolunteerApplications },
                 { QueryType.HeadOrSpouseWithEmail, HeadOrSpouseWithEmail },
                 { QueryType.InBFClass, InBFClass },
-                { QueryType.InCurrentOrg, InCurrentOrg },
                 { QueryType.InOneOfMyOrgs, InOneOfMyOrgs },
+                { QueryType.InSqlList, InSqlList },
                 { QueryType.IsCurrentPerson, IsCurrentPerson },
                 { QueryType.IsCurrentUser, IsCurrentUser },
                 { QueryType.IsFamilyGiver, IsFamilyGiver },
@@ -107,9 +113,11 @@ namespace CmsData
                 { QueryType.IsPreviousMemberOf, IsPreviousMemberOf },
                 { QueryType.IsProspectOf, IsProspectOf },
                 { QueryType.IsRecentGiver, IsRecentGiver },
+                { QueryType.IsRecentGiverFunds, IsRecentGiverFunds },
                 { QueryType.IsTopGiver, IsTopGiver },
                 { QueryType.IsTopPledger, IsTopPledger },
                 { QueryType.IsUser, IsUser },
+                { QueryType.JoinDateMonthsAgo, JoinDateMonthsAgo },
                 { QueryType.KidsRecentAttendCount, KidsRecentAttendCount },
                 { QueryType.LeadersUnderCurrentOrg, LeadersUnderCurrentOrg },
                 { QueryType.MadeContactTypeAsOf, MadeContactTypeAsOf },
@@ -125,9 +133,11 @@ namespace CmsData
                 { QueryType.MembOfOrgWithSched, MembOfOrgWithSched },
                 { QueryType.NeedAttendance, NeedAttendance },
                 { QueryType.NonTaxDedAmount, NonTaxDedAmount },
+                { QueryType.NonTaxDedAmountDonorOnly, NonTaxDedAmountDonorOnly },
                 { QueryType.NumberOfFamilyMembers, NumberOfFamilyMembers },
                 { QueryType.NumberOfMemberships, NumberOfMemberships },
                 { QueryType.NumberOfPrimaryAdults, NumberOfPrimaryAdults },
+                { QueryType.OrgFilter, OrgFilter },
                 { QueryType.OrgInactiveDate, OrgInactiveDate },
                 { QueryType.OrgJoinDate, OrgJoinDate },
                 { QueryType.OrgJoinDateCompare, OrgJoinDateCompare },
@@ -139,6 +149,7 @@ namespace CmsData
                 { QueryType.PeopleExtraData, PeopleExtraData },
                 { QueryType.PeopleExtraDate, PeopleExtraDate },
                 { QueryType.PeopleExtraInt, PeopleExtraInt },
+                { QueryType.PeopleExtraAttr, PeopleExtraAttr },
                 { QueryType.FamilyExtra, FamilyExtra },
                 { QueryType.FamilyExtraData, FamilyExtraData },
                 { QueryType.FamilyExtraDate, FamilyExtraDate },
@@ -150,6 +161,7 @@ namespace CmsData
                 { QueryType.VisitedCurrentOrg, VisitedCurrentOrg },
                 { QueryType.ProspectCurrentOrg, ProspectCurrentOrg },
                 { QueryType.PmmBackgroundCheckStatus, BackgroundCheckStatus },
+                { QueryType.QueryTag, QueryTag },
                 { QueryType.RecActiveOtherChurch, RecActiveOtherChurch },
                 { QueryType.RecentAttendCount, RecentAttendCount },
                 { QueryType.RecentAttendCountAttCred, RecentAttendCountAttCred },
@@ -167,6 +179,7 @@ namespace CmsData
                 { QueryType.RecentDecisionType, RecentDecisionType },
                 { QueryType.RecentEmailCount, RecentEmailCount },
                 { QueryType.RecentEmailSentCount, RecentEmailSentCount },
+                { QueryType.RecentFamilyAdultLastAttend, RecentFamilyAdultLastAttend },
                 { QueryType.RecentFirstFamilyVisit, RecentFirstFamilyVisit },
                 { QueryType.RecentFirstTimeGiver, RecentFirstTimeGiver },
                 { QueryType.RecentFlagAdded, RecentFlagAdded },
@@ -174,11 +187,13 @@ namespace CmsData
                 { QueryType.RecentHasFailedRecurringGiving, RecentHasFailedRecurringGiving },
                 { QueryType.RecentIncompleteRegistrations, RecentIncompleteRegistrations },
                 { QueryType.RecentJoinChurch, RecentJoinChurch },
+                { QueryType.RecentJoinChurchDaysRange, RecentJoinChurchDaysRange },
                 { QueryType.RecentNonTaxDedAmount, RecentNonTaxDedAmount },
                 { QueryType.RecentNonTaxDedCount, RecentNonTaxDedCount },
                 { QueryType.RecentPeopleExtraFieldChanged, RecentPeopleExtraFieldChanged },
                 { QueryType.RecentPledgeAmount, RecentPledgeAmount },
                 { QueryType.RecentPledgeAmountBothJoint, RecentPledgeAmountBothJoint },
+                { QueryType.PledgeBalance, PledgeBalance},
                 { QueryType.RecentPledgeCount, RecentPledgeCount },
                 { QueryType.RecentRegistrationType, RecentRegistrationType },
                 { QueryType.RecentVisitNumber, RecentVisitNumber },
@@ -207,7 +222,9 @@ namespace CmsData
             db = Db;
             Func<Expression> f = null;
             if (expressionDictionary.TryGetValue(FieldInfo.QueryType, out f))
+            {
                 return f();
+            }
 
             var isMultiple = op == CompareType.OneOf || op == CompareType.NotOneOf;
             switch (FieldInfo.QueryType)

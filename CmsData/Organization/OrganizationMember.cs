@@ -20,16 +20,16 @@ namespace CmsData
     {
         private const string STR_MeetingsToUpdate = "MeetingsToUpdate";
 
-        public EnrollmentTransaction Drop(CMSDataContext db)
+        public EnrollmentTransaction Drop(CMSDataContext db, bool skipTriggerProcessing = false)
         {
-            return Drop(db, DateTime.Now);
+            return Drop(db, DateTime.Now, skipTriggerProcessing);
         }
 
-        public EnrollmentTransaction Drop(CMSDataContext db, DateTime dropdate)
+        public EnrollmentTransaction Drop(CMSDataContext db, DateTime dropdate, bool skipTriggerProcessing = false)
         {
-            return Drop(db, dropdate, Organization.OrganizationName);
+            return Drop(db, dropdate, Organization.OrganizationName, skipTriggerProcessing);
         }
-        public EnrollmentTransaction Drop(CMSDataContext db, DateTime dropdate, string orgname)
+        public EnrollmentTransaction Drop(CMSDataContext db, DateTime dropdate, string orgname, bool skipTriggerProcessing = false)
         {
             db.SubmitChanges();
             while (true)
@@ -61,10 +61,12 @@ namespace CmsData
                     Tickets = Tickets,
                     RegisterEmail = RegisterEmail,
                     Score = Score,
-                    SmallGroups = string.Join("\n", sglist)
+                    SmallGroups = string.Join("\n", sglist),
+                    SkipInsertTriggerProcessing = skipTriggerProcessing
                 };
 
                 db.EnrollmentTransactions.InsertOnSubmit(droptrans);
+                db.OrgMemberExtras.DeleteAllOnSubmit(this.OrgMemberExtras);
                 db.OrgMemMemTags.DeleteAllOnSubmit(this.OrgMemMemTags);
                 db.SubmitChanges();
                 foreach (var ev in this.OrgMemberExtras)
@@ -140,7 +142,7 @@ AND a.PeopleId = {2}
 
         public static void UpdateMeetingsToUpdate(CMSDataContext Db)
         {
-            var mids = HttpContext.Current.Items[STR_MeetingsToUpdate] as List<int>;
+            var mids = HttpContextFactory.Current.Items[STR_MeetingsToUpdate] as List<int>;
             if (mids != null)
                 foreach (var mid in mids)
                     Db.UpdateMeetingCounters(mid);
@@ -221,11 +223,13 @@ AND a.PeopleId = {2}
             }
         }
 
+        [Obsolete]
         public void AddToGroup(CMSDataContext Db, string name)
         {
             int? n = null;
             AddToGroup(Db, name, n);
         }
+
         public int AddToGroup(CMSDataContext Db, int n)
         {
             var omt = Db.OrgMemMemTags.SingleOrDefault(t =>
@@ -246,6 +250,7 @@ AND a.PeopleId = {2}
             return 0;
         }
 
+        [Obsolete]
         public void AddToGroup(CMSDataContext Db, string name, int? n)
         {
             if (!name.HasValue())
@@ -314,7 +319,10 @@ AND a.PeopleId = {2}
                     if (m != null)
                     {
                         m.Pending = pending;
-                        m.MemberTypeId = memberTypeId;
+                        if (m.MemberTypeId == MemberTypeCode.Member || m.MemberTypeId == 0 || m.MemberTypeId == MemberTypeCode.Prospect)
+                        {
+                            m.MemberTypeId = memberTypeId;
+                        }
                         db.SubmitChanges();
                         return m;
                     }
@@ -483,6 +491,14 @@ AND a.PeopleId = {2}
                 return 0;
             return (ts.IndAmt ?? 0) - TotalPaid(db);
         }
+        public static decimal AmountDue(CMSDataContext db, int orgid, int pid)
+        {
+            var om = db.OrganizationMembers.SingleOrDefault(
+                    vv => vv.OrganizationId == orgid && vv.PeopleId == pid);
+            if (om == null)
+                return 0;
+            return om.AmountDue(db);
+        }
 
         public decimal? AmountPaidTransactions(CMSDataContext db)
         {
@@ -556,8 +572,8 @@ AND a.PeopleId = {2}
             var o = db.LoadOrganizationById(orgid);
             if (o == null || o.RegistrationTypeId != RegistrationTypeCode.ChooseVolunteerTimes)
                 return false;
-            if (HttpContext.Current.User.IsInRole("Admin") ||
-                HttpContext.Current.User.IsInRole("ManageVolunteers"))
+            if (HttpContextFactory.Current.User.IsInRole("Admin") ||
+                HttpContextFactory.Current.User.IsInRole("ManageVolunteers"))
                 return true;
             var leaderorgs = db.GetLeaderOrgIds(Util.UserPeopleId);
             if (leaderorgs == null)
@@ -571,7 +587,8 @@ AND a.PeopleId = {2}
         }
         public OrgMemberExtra GetExtraValue(string field)
         {
-            var ev = OrgMemberExtras.AsEnumerable().FirstOrDefault(ee => ee.Field.Equal(field));
+            field = field.Trim();
+            var ev = OrgMemberExtras.AsEnumerable().FirstOrDefault(ee => ee.Field == field);
             if (ev == null)
             {
                 ev = new OrgMemberExtra()
@@ -586,7 +603,7 @@ AND a.PeopleId = {2}
         }
         public static OrgMemberExtra GetExtraValue(CMSDataContext db, int oid, int pid, string field)
         {
-            //field = field.Replace('/', '-');
+            field = field.Trim();
             var q = from v in db.OrgMemberExtras
                     where v.Field == field
                     where v.OrganizationId == oid
@@ -650,7 +667,7 @@ AND a.PeopleId = {2}
                 return oev.IntValue.ToString();
             return oev.BitValue.ToString();
         }
-        public void AddEditExtraCode(string field, string value)
+        public void AddEditExtraCode(string field, string value, string location = null)
         {
             if (!field.HasValue())
                 return;
@@ -686,7 +703,7 @@ AND a.PeopleId = {2}
             ev.TransactionTime = DateTime.Now;
         }
 
-        public void AddEditExtraBool(string field, bool tf)
+        public void AddEditExtraBool(string field, bool tf, string name = null, string location = null)
         {
             if (!field.HasValue())
                 return;
@@ -724,12 +741,14 @@ AND a.PeopleId = {2}
         {
             if (fromOrg == toOrg)
                 return;
-            var om = db.OrganizationMembers.Single(m => m.PeopleId == pid && m.OrganizationId == fromOrg);
+            var om = db.OrganizationMembers.SingleOrDefault(m => m.PeopleId == pid && m.OrganizationId == fromOrg);
+            if (om == null)
+                return;
             var tom = db.OrganizationMembers.SingleOrDefault(m => m.PeopleId == pid && m.OrganizationId == toOrg);
             if (tom == null)
             {
                 tom = InsertOrgMembers(db,
-                    toOrg, pid, MemberTypeCode.Member, DateTime.Now, null, om.Pending ?? false);
+                    toOrg, pid, MemberTypeCode.Member, DateTime.Now, null, om.Pending ?? false, skipTriggerProcessing:true);
                 if (tom == null)
                     return;
             }
@@ -767,7 +786,7 @@ AND a.PeopleId = {2}
 
             if (om.OrganizationId != tom.OrganizationId)
                 tom.Moved = true;
-            om.Drop(db);
+            om.Drop(db, skipTriggerProcessing: true);            
             db.SubmitChanges();
         }
     }
